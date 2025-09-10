@@ -1,4 +1,4 @@
-const { createClient } = supabase;
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
 // --- CONFIGURAZIONE SUPABASE ---
 const SUPABASE_URL = 'https://nxkcnjzkjboorltirjad.supabase.co';
@@ -101,4 +101,5 @@ async function checkUserSession() {
 
 // Avvia l'applicazione
 checkUserSession();
+
 
