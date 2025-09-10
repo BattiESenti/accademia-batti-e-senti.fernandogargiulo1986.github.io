@@ -102,4 +102,3 @@ async function checkUserSession() {
 // Avvia l'applicazione
 checkUserSession();
 
-
