@@ -1,5 +1,5 @@
 // TEST INFALLIBILE: Se vedi questo alert, stai eseguendo il file JS corretto.
-alert("Questo è il nuovo file app.js! Se l'errore persiste, il problema è nel codice sottostante.");
+// alert("Questo è il nuovo file app.js! Se l'errore persiste, il problema è nel codice sottostante.");
 
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
