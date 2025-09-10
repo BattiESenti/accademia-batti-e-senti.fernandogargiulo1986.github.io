@@ -6,7 +6,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 // --- CONFIGURAZIONE SUPABASE ---
 // URL corretto, senza errori di battitura.
 const SUPABASE_URL = 'https://nxkcnjzkjboorltirjad.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzIఒNiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54a2NuanpramJvb3JsdGlyamFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4MDkyNzAsImV4cCI6MjA3MjM4NTI3MH0.E1tK4QOlhpTPMtmYLRZtTvDy5QT_wej25cZAMkBh4CM';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54a2NuanpramJvb3JsdGlyamFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4MDkyNzAsImV4cCI6MjA3MjM4NTI3MH0.E1tK4QOlhpTPMtmYLRZtTvDy5QT_wej25cZAMkBh4CM';
 const sbClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // --- RIFERIMENTI AGLI ELEMENTI DEL DOM ---
