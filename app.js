@@ -1,8 +1,12 @@
+// TEST INFALLIBILE: Se vedi questo alert, stai eseguendo il file JS corretto.
+alert("Questo è il nuovo file app.js! Se l'errore persiste, il problema è nel codice sottostante.");
+
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
 // --- CONFIGURAZIONE SUPABASE ---
+// URL corretto, senza errori di battitura.
 const SUPABASE_URL = 'https://nxkcnjzkjboorltirjad.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54a2NuanpramJvb3JsdGlyamFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4MDkyNzAsImV4cCI6MjA3MjM4NTI3MH0.E1tK4QOlhpTPMtmYLRZtTvDy5QT_wej25cZAMkBh4CM';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzIఒNiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54a2NuanpramJvb3JsdGlyamFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4MDkyNzAsImV4cCI6MjA3MjM4NTI3MH0.E1tK4QOlhpTPMtmYLRZtTvDy5QT_wej25cZAMkBh4CM';
 const sbClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // --- RIFERIMENTI AGLI ELEMENTI DEL DOM ---
@@ -51,7 +55,6 @@ function showAppScreen(user) {
 }
 
 // --- LOGICA PRINCIPALE ---
-// Funzione per caricare i dati dell'utente (es. il ruolo) e aggiornare l'UI
 async function loadUserDataAndRenderUI(user) {
     showAppScreen(user);
 
@@ -71,7 +74,6 @@ async function loadUserDataAndRenderUI(user) {
     }
     
     // 2. Aggiungi il link "Amministrazione" per gli admin
-    // Pulisce il link admin se esisteva da un login precedente
     const existingAdminLink = document.getElementById('admin-link');
     if (existingAdminLink) existingAdminLink.remove();
 
@@ -83,10 +85,8 @@ async function loadUserDataAndRenderUI(user) {
         adminLink.textContent = 'Amministrazione';
         appNavigation.appendChild(adminLink);
     }
-
-    // 3. (Futuro) Qui caricheremo i dati del calendario e delle tabelle
+    
     console.log(`Utente loggato con ruolo: ${profile.ruolo}`);
-    // initializeCalendar(profile.ruolo);
 }
 
 // Controlla se l'utente è già loggato al caricamento della pagina
