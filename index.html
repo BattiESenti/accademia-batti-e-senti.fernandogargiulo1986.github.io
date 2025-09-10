@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accademia Musicale - Registro Appuntamenti</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- FullCalendar JS (lo useremo più avanti) -->
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
+
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        /* Stile per un feedback visivo immediato durante il caricamento */
+        body {
+            transition: background-color 0.3s;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <!-- =========== SEZIONE LOGIN =========== -->
+    <div id="login-section" class="flex items-center justify-center min-h-screen">
+        <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
+            <h2 class="text-2xl font-bold text-center text-gray-800">Accademia Musicale</h2>
+            <p class="text-center text-gray-600">Accedi al registro appuntamenti</p>
+            <form id="login-form" class="space-y-6">
+                <div>
+                    <label for="email" class="text-sm font-medium text-gray-700">Email</label>
+                    <input id="email" name="email" type="email" required class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" placeholder="tua@email.com">
+                </div>
+                <div>
+                    <label for="password" class="text-sm font-medium text-gray-700">Password</label>
+                    <input id="password" name="password" type="password" required class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" placeholder="••••••••">
+                </div>
+                <div>
+                    <button type="submit" class="w-full px-4 py-2 font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        Accedi
+                    </button>
+                </div>
+            </form>
+            <div id="login-error" class="text-sm text-center text-red-600"></div>
+        </div>
+    </div>
+
+    <!-- =========== SEZIONE APP PRINCIPALE (nascosta di default) =========== -->
+    <div id="app-section" class="hidden">
+        <!-- Header -->
+        <header class="bg-white shadow-md">
+            <nav class="container mx-auto px-6 py-3 flex justify-between items-center">
+                <h1 class="text-xl font-bold text-indigo-600">Registro Appuntamenti</h1>
+                <div class="flex items-center space-x-4">
+                    <span id="user-email" class="text-sm text-gray-600"></span>
+                    <button id="logout-button" class="px-3 py-1 text-sm font-medium text-white bg-red-500 rounded-md hover:bg-red-600">
+                        Logout
+                    </button>
+                </div>
+            </nav>
+        </header>
+
+        <!-- Corpo dell'App -->
+        <main class="container mx-auto p-6 flex">
+            <!-- Navigazione Laterale -->
+            <aside class="w-64 mr-8">
+                <nav id="app-navigation" class="space-y-2">
+                    <a href="#" class="block px-4 py-2 text-gray-700 bg-gray-200 rounded-md font-bold">Calendario</a>
+                    <a href="#" class="block px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-md">Appuntamenti & Note</a>
+                    <!-- Il link Admin sarà aggiunto qui dinamicamente da JS -->
+                </nav>
+            </aside>
+            
+            <!-- Area Contenuti Principale -->
+            <div id="content-area" class="w-full bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-bold mb-4">Calendario Appuntamenti</h2>
+                <!-- Il calendario di FullCalendar verrà renderizzato qui -->
+                <div id="calendar"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Il nostro codice JavaScript è ora in un file separato -->
+    <script type="module" src="app.js"></script>
+    
+</body>
+</html>
+
