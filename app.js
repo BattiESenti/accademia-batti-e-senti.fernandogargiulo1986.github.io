@@ -14,6 +14,10 @@ const userEmailSpan = document.getElementById('user-email');
 const logoutButton = document.getElementById('logout-button');
 const appNavigation = document.getElementById('app-navigation');
 
+// Viste principali
+const calendarView = document.getElementById('calendar-view');
+const adminView = document.getElementById('admin-view');
+
 // Elementi del modale
 const modal = document.getElementById('appointment-modal');
 const modalTitle = document.getElementById('modal-title');
@@ -29,14 +33,31 @@ const saveButton = document.getElementById('save-appointment-button');
 const cancelButton = document.getElementById('cancel-modal-button');
 const deleteButton = document.getElementById('delete-appointment-button');
 
+// Elementi Admin
+const adminTabs = {
+    students: document.getElementById('tab-students'),
+    teachers: document.getElementById('tab-teachers'),
+    classrooms: document.getElementById('tab-classrooms'),
+};
+const adminContents = {
+    students: document.getElementById('admin-content-students'),
+    teachers: document.getElementById('admin-content-teachers'),
+    classrooms: document.getElementById('admin-content-classrooms'),
+};
+const tableBodies = {
+    students: document.getElementById('students-table-body'),
+    teachers: document.getElementById('teachers-table-body'),
+    classrooms: document.getElementById('classrooms-table-body'),
+};
+
 
 // --- VARIABILI GLOBALI DI STATO ---
 let calendar;
 let currentUser = null;
 let currentUserRole = null;
-let newAppointmentInfo = null; // Per memorizzare data/ora del nuovo appuntamento
+let newAppointmentInfo = null;
 
-// --- LOGICA DI AUTENTICAZIONE ---
+// --- LOGICA DI AUTENTICAZIONE E UI PRINCIPALE---
 
 loginForm.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -86,20 +107,27 @@ async function loadUserDataAndRenderUI(user) {
     currentUserRole = profile.ruolo;
     updateNavigation(profile.ruolo);
     initializeCalendar(user, profile.ruolo);
+    showView('calendar'); // Mostra il calendario di default
     console.log(`Utente loggato con ruolo: ${profile.ruolo}`);
 }
 
 function updateNavigation(role) {
-    const existingAdminLink = document.getElementById('admin-link');
+    // Rimuovi link admin esistente se c'è
+    const existingAdminLink = document.getElementById('nav-admin');
     if (existingAdminLink) existingAdminLink.remove();
+
+    // Aggiungi link admin se l'utente è admin
     if (role === 'admin') {
         const adminLink = document.createElement('a');
         adminLink.href = '#';
-        adminLink.id = 'admin-link';
-        adminLink.className = 'block px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-md';
+        adminLink.id = 'nav-admin';
+        adminLink.className = 'nav-link block px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-md';
         adminLink.textContent = 'Amministrazione';
         appNavigation.appendChild(adminLink);
     }
+    
+    // Aggiungi event listeners per la navigazione
+    setupEventListeners();
 }
 
 async function checkUserSession() {
@@ -110,6 +138,102 @@ async function checkUserSession() {
     } else {
         showLoginScreen();
     }
+}
+
+
+// --- GESTIONE VISTE E NAVIGAZIONE ---
+
+function showView(viewName) {
+    // Nascondi tutte le viste
+    calendarView.classList.add('hidden');
+    adminView.classList.add('hidden');
+
+    // Rimuovi la classe 'active' da tutti i link di navigazione
+    document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+
+    // Mostra la vista richiesta e imposta il link attivo
+    if (viewName === 'calendar') {
+        calendarView.classList.remove('hidden');
+        document.getElementById('nav-calendar').classList.add('active');
+    } else if (viewName === 'admin') {
+        adminView.classList.remove('hidden');
+        const adminLink = document.getElementById('nav-admin');
+        if (adminLink) adminLink.classList.add('active');
+        loadAdminData(); // Carica i dati quando la vista viene mostrata
+    }
+}
+
+function setupEventListeners() {
+    document.getElementById('nav-calendar').addEventListener('click', (e) => {
+        e.preventDefault();
+        showView('calendar');
+    });
+
+    const adminLink = document.getElementById('nav-admin');
+    if (adminLink) {
+        adminLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            showView('admin');
+        });
+    }
+
+    // Aggiungi listener per i tab del pannello admin
+    Object.keys(adminTabs).forEach(key => {
+        adminTabs[key].addEventListener('click', () => showAdminTab(key));
+    });
+}
+
+// --- LOGICA PANNELLO DI AMMINISTRAZIONE ---
+
+function showAdminTab(tabName) {
+    // Gestione stile tab
+    Object.values(adminTabs).forEach(tab => {
+        tab.classList.remove('text-indigo-600', 'border-indigo-500');
+        tab.classList.add('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300', 'border-transparent');
+    });
+    adminTabs[tabName].classList.add('text-indigo-600', 'border-indigo-500');
+    adminTabs[tabName].classList.remove('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300', 'border-transparent');
+
+    // Gestione visualizzazione contenuto
+    Object.values(adminContents).forEach(content => content.classList.add('hidden'));
+    adminContents[tabName].classList.remove('hidden');
+}
+
+
+async function loadAdminData() {
+    // Carica e renderizza studenti
+    const { data: students, error: studentsError } = await sbClient.from('profiles').select('id, nome, email').eq('ruolo', 'student');
+    if(studentsError) console.error("Errore caricamento studenti:", studentsError);
+    else renderTable(tableBodies.students, students, ['nome', 'email']);
+
+    // Carica e renderizza insegnanti
+    const { data: teachers, error: teachersError } = await sbClient.from('profiles').select('id, nome, email').eq('ruolo', 'teacher');
+    if(teachersError) console.error("Errore caricamento insegnanti:", teachersError);
+    else renderTable(tableBodies.teachers, teachers, ['nome', 'email']);
+
+    // Carica e renderizza aule
+    const { data: classrooms, error: classroomsError } = await sbClient.from('aule').select('id, nome');
+    if(classroomsError) console.error("Errore caricamento aule:", classroomsError);
+    else renderTable(tableBodies.classrooms, classrooms, ['nome']);
+}
+
+function renderTable(tbody, data, columns) {
+    tbody.innerHTML = ''; // Pulisci la tabella
+    if (data.length === 0) {
+        const row = `<tr><td colspan="${columns.length}" class="px-6 py-4 text-center text-gray-500">Nessun dato disponibile.</td></tr>`;
+        tbody.innerHTML = row;
+        return;
+    }
+    data.forEach(item => {
+        const row = document.createElement('tr');
+        columns.forEach(col => {
+            const cell = document.createElement('td');
+            cell.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-800';
+            cell.textContent = item[col] || '-';
+            row.appendChild(cell);
+        });
+        tbody.appendChild(row);
+    });
 }
 
 
