@@ -42,10 +42,14 @@ const adminEditType = document.getElementById('admin-edit-type');
 const adminInputName = document.getElementById('admin-input-name');
 const adminInputEmailContainer = document.getElementById('admin-input-email-container');
 const adminInputEmail = document.getElementById('admin-input-email');
+const adminInputPasswordContainer = document.getElementById('admin-input-password-container');
+const adminInputPassword = document.getElementById('admin-input-password');
 const adminCancelButton = document.getElementById('admin-cancel-button');
 const adminSaveButton = document.getElementById('admin-save-button');
 
 // Elementi Admin
+const addStudentBtn = document.getElementById('add-student-btn');
+const addTeacherBtn = document.getElementById('add-teacher-btn');
 const addClassroomBtn = document.getElementById('add-classroom-btn');
 const adminTabs = {
     students: document.getElementById('tab-students'),
@@ -189,7 +193,9 @@ function setupEventListeners() {
         tbody.addEventListener('click', handleAdminTableClick);
     });
     
-    addClassroomBtn.addEventListener('click', () => openAdminModal('classroom'));
+    addStudentBtn.addEventListener('click', () => openAdminModal('students'));
+    addTeacherBtn.addEventListener('click', () => openAdminModal('teachers'));
+    addClassroomBtn.addEventListener('click', () => openAdminModal('classrooms'));
     adminForm.addEventListener('submit', handleAdminFormSubmit);
     adminCancelButton.addEventListener('click', closeAdminModal);
 }
@@ -266,7 +272,6 @@ async function handleAdminDelete(id, type, name) {
     if (type === 'students' || type === 'teachers') {
         const { error: deleteError } = await sbClient.from('profiles').delete().eq('id', id);
         error = deleteError;
-        // Nota: questo elimina solo il profilo, non l'utente da Supabase Auth.
         // Per una pulizia completa, l'utente dovrebbe essere eliminato anche dalla sezione Authentication.
     } else if (type === 'classrooms') {
         const { error: deleteError } = await sbClient.from('aule').delete().eq('id', id);
@@ -286,14 +291,28 @@ function openAdminModal(type, item = null) {
     adminEditType.value = type;
 
     if (type === 'students' || type === 'teachers') {
-        adminModalTitle.textContent = `Modifica ${type === 'students' ? 'Studente' : 'Insegnante'}`;
-        adminInputName.value = item ? item.nome : '';
-        adminInputEmail.value = item ? item.email : '';
         adminInputEmailContainer.classList.remove('hidden');
+        if (item) { // Edit mode
+            adminModalTitle.textContent = `Modifica ${type === 'students' ? 'Studente' : 'Insegnante'}`;
+            adminInputName.value = item.nome;
+            adminInputEmail.value = item.email;
+            adminInputEmail.readOnly = true;
+            adminInputEmail.classList.add('bg-gray-100');
+            adminInputPasswordContainer.classList.add('hidden');
+            adminInputPassword.required = false;
+        } else { // Create mode
+            adminModalTitle.textContent = `Nuovo ${type === 'students' ? 'Studente' : 'Insegnante'}`;
+            adminInputEmail.readOnly = false;
+            adminInputEmail.classList.remove('bg-gray-100');
+            adminInputPasswordContainer.classList.remove('hidden');
+            adminInputPassword.required = true;
+        }
     } else if (type === 'classrooms') {
         adminModalTitle.textContent = item ? 'Modifica Aula' : 'Nuova Aula';
         adminInputName.value = item ? item.nome : '';
         adminInputEmailContainer.classList.add('hidden');
+        adminInputPasswordContainer.classList.add('hidden');
+        adminInputPassword.required = false;
     }
     
     adminModal.classList.remove('hidden');
@@ -310,18 +329,51 @@ async function handleAdminFormSubmit(event) {
     const id = adminEditId.value;
     const type = adminEditType.value;
     const name = adminInputName.value;
-
     let error;
-    if (type === 'students' || type === 'teachers') {
-        const { error: updateError } = await sbClient.from('profiles').update({ nome: name }).eq('id', id);
-        error = updateError;
-    } else if (type === 'classrooms') {
-        if (id) { // Modifica
-            const { error: updateError } = await sbClient.from('aule').update({ nome: name }).eq('id', id);
-            error = updateError;
-        } else { // Creazione
-            const { error: insertError } = await sbClient.from('aule').insert({ nome: name });
-            error = insertError;
+
+    if (id) { // --- EDIT MODE ---
+        if (type === 'students' || type === 'teachers') {
+            ({ error } = await sbClient.from('profiles').update({ nome: name }).eq('id', id));
+        } else if (type === 'classrooms') {
+            ({ error } = await sbClient.from('aule').update({ nome: name }).eq('id', id));
+        }
+    } else { // --- CREATE MODE ---
+        if (type === 'students' || type === 'teachers') {
+            const email = adminInputEmail.value;
+            const password = adminInputPassword.value;
+            
+            // Salva la sessione corrente dell'admin
+            const { data: { session: adminSession }, error: sessionError } = await sbClient.auth.getSession();
+             if (sessionError) {
+                alert('Errore di sessione, impossibile creare utente.');
+                return;
+            }
+
+            // Crea il nuovo utente (questo fa il logout dell'admin temporaneamente)
+            const { data: newUser, error: signUpError } = await sbClient.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: {
+                        nome: name,
+                        ruolo: type === 'students' ? 'student' : 'teacher'
+                    }
+                }
+            });
+
+            if (signUpError) {
+                error = signUpError;
+            } else {
+                 // Ripristina la sessione dell'admin
+                const { error: restoreError } = await sbClient.auth.setSession(adminSession);
+                if(restoreError) {
+                    alert('Nuovo utente creato, ma si è verificato un errore nel ripristino della sessione admin. Si prega di effettuare nuovamente il login.');
+                    await sbClient.auth.signOut();
+                    showLoginScreen();
+                }
+            }
+        } else if (type === 'classrooms') {
+            ({ error } = await sbClient.from('aule').insert({ nome: name }));
         }
     }
 
