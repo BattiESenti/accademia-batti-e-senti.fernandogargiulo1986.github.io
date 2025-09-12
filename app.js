@@ -14,10 +14,25 @@ const userEmailSpan = document.getElementById('user-email');
 const logoutButton = document.getElementById('logout-button');
 const appNavigation = document.getElementById('app-navigation');
 const calendarEl = document.getElementById('calendar');
+// Elementi del modale
+const appointmentModal = document.getElementById('appointment-modal');
+const appointmentModalBackdrop = document.getElementById('appointment-modal-backdrop');
+const modalCloseButton = document.getElementById('modal-close-button');
+const modalCancelButton = document.getElementById('modal-cancel-button');
+const appointmentForm = document.getElementById('appointment-form');
+const modalTitle = document.getElementById('modal-title');
+const modalTimeDisplay = document.getElementById('modal-time-display');
+const teacherSelectContainer = document.getElementById('teacher-select-container');
+const teacherSelect = document.getElementById('teacher-select');
+const studentSelect = document.getElementById('student-select');
+const aulaSelect = document.getElementById('aula-select');
+const noteTextarea = document.getElementById('note-textarea');
+const appointmentIdInput = document.getElementById('appointment-id');
 
-let calendar; // Variabile globale per l'istanza del calendario
-let currentUser = null; // Memorizza l'utente corrente
-let currentUserRole = null; // Memorizza il ruolo dell'utente corrente
+let calendar; 
+let currentUser = null; 
+let currentUserRole = null; 
+let selectedDateInfo = null; // Memorizza le info della data selezionata
 
 // --- GESTIONE AUTENTICAZIONE E UI ---
 
@@ -78,7 +93,6 @@ async function loadUserDataAndRenderUI(user) {
     
     showAppScreen(user);
     
-    // Mostra/nascondi link amministrazione
     const existingAdminLink = document.getElementById('admin-link');
     if (existingAdminLink) existingAdminLink.remove();
     if (currentUserRole === 'admin') {
@@ -102,7 +116,94 @@ async function checkUserSession() {
     }
 }
 
+// --- GESTIONE MODALE APPUNTAMENTI ---
+
+function openAppointmentModal() {
+    appointmentModal.classList.remove('hidden');
+}
+
+function closeAppointmentModal() {
+    appointmentModal.classList.add('hidden');
+    appointmentForm.reset();
+    selectedDateInfo = null;
+}
+
+modalCloseButton.addEventListener('click', closeAppointmentModal);
+modalCancelButton.addEventListener('click', closeAppointmentModal);
+appointmentModalBackdrop.addEventListener('click', closeAppointmentModal);
+
+async function populateModalDropdowns() {
+    // Popola studenti
+    const { data: students, error: studentsError } = await sbClient.from('profiles').select('id, nome').eq('ruolo', 'student');
+    if (studentsError) throw studentsError;
+    studentSelect.innerHTML = '<option value="">Seleziona studente...</option>';
+    students.forEach(s => studentSelect.innerHTML += `<option value="${s.id}">${s.nome}</option>`);
+
+    // Popola aule
+    const { data: aule, error: auleError } = await sbClient.from('aule').select('id, nome');
+    if (auleError) throw auleError;
+    aulaSelect.innerHTML = '<option value="">Seleziona aula...</option>';
+    aule.forEach(a => aulaSelect.innerHTML += `<option value="${a.id}">${a.nome}</option>`);
+
+    // Popola insegnanti (solo per admin)
+    if (currentUserRole === 'admin') {
+        teacherSelectContainer.classList.remove('hidden');
+        const { data: teachers, error: teachersError } = await sbClient.from('profiles').select('id, nome').eq('ruolo', 'teacher');
+        if (teachersError) throw teachersError;
+        teacherSelect.innerHTML = '<option value="">Seleziona insegnante...</option>';
+        teachers.forEach(t => teacherSelect.innerHTML += `<option value="${t.id}">${t.nome}</option>`);
+    } else {
+        teacherSelectContainer.classList.add('hidden');
+    }
+}
+
+appointmentForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!selectedDateInfo) return;
+
+    const newAppointment = {
+        studente_id: studentSelect.value,
+        aula_id: aulaSelect.value,
+        note: noteTextarea.value,
+        data_inizio: selectedDateInfo.startStr,
+        data_fine: selectedDateInfo.endStr,
+        insegnante_id: currentUserRole === 'admin' ? teacherSelect.value : currentUser.id,
+    };
+
+    if (currentUserRole === 'admin' && !newAppointment.insegnante_id) {
+        alert("Per favore, seleziona un insegnante.");
+        return;
+    }
+
+    const { error } = await sbClient.from('appuntamenti').insert([newAppointment]);
+
+    if (error) {
+        console.error("Errore nel salvare l'appuntamento:", error);
+        alert(`Errore: ${error.message}`);
+    } else {
+        closeAppointmentModal();
+        calendar.refetchEvents();
+    }
+});
+
+
 // --- GESTIONE CALENDARIO ---
+
+async function handleDateSelect(info) {
+    selectedDateInfo = info;
+    appointmentForm.reset();
+    appointmentIdInput.value = '';
+    modalTitle.textContent = 'Nuovo Appuntamento';
+    modalTimeDisplay.textContent = `Dalle ${info.start.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })} alle ${info.end.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })} del ${info.start.toLocaleDateString('it-IT')}`;
+    
+    try {
+        await populateModalDropdowns();
+        openAppointmentModal();
+    } catch (error) {
+        console.error("Errore nel popolare i dati del modale:", error);
+        alert("Impossibile caricare i dati per la creazione dell'appuntamento.");
+    }
+}
 
 async function initializeCalendar() {
     if (calendar) {
@@ -122,11 +223,13 @@ async function initializeCalendar() {
         slotMinTime: '08:00:00',
         slotMaxTime: '21:00:00',
         allDaySlot: false,
-        height: 'auto', // Migliora la gestione dell'altezza su mobile
+        height: 'auto',
+        selectable: currentUserRole === 'admin' || currentUserRole === 'teacher',
+        select: handleDateSelect,
         events: async (fetchInfo, successCallback, failureCallback) => {
             try {
                 let allEvents = [];
-                // Admin vede tutto, con nomi di studenti e insegnanti
+                // Admin vede tutto
                 if (currentUserRole === 'admin') {
                     const { data, error } = await sbClient.from('appuntamenti').select('*, studente_id(nome), insegnante_id(nome), aula_id(nome)');
                     if (error) throw error;
@@ -135,13 +238,10 @@ async function initializeCalendar() {
                         title: `${apt.studente_id.nome} con ${apt.insegnante_id.nome}`,
                         start: apt.data_inizio,
                         end: apt.data_fine,
-                        extendedProps: {
-                            aula: apt.aula_id.nome,
-                            note: apt.note
-                        }
+                        extendedProps: { aula: apt.aula_id.nome, note: apt.note }
                     }));
                 }
-                // Studente vede solo i suoi appuntamenti
+                // Studente vede solo i suoi
                 else if (currentUserRole === 'student') {
                     const { data, error } = await sbClient.from('appuntamenti').select('*, insegnante_id(nome), aula_id(nome)').eq('studente_id', currentUser.id);
                     if (error) throw error;
@@ -150,15 +250,11 @@ async function initializeCalendar() {
                         title: `Lezione con ${apt.insegnante_id.nome}`,
                         start: apt.data_inizio,
                         end: apt.data_fine,
-                        extendedProps: {
-                            aula: apt.aula_id.nome,
-                            note: apt.note
-                        }
+                        extendedProps: { aula: apt.aula_id.nome, note: apt.note }
                     }));
                 }
-                // Insegnante vede i suoi appuntamenti + slot occupati
+                // Insegnante vede i suoi + slot occupati
                 else if (currentUserRole === 'teacher') {
-                    // 1. Carica i propri appuntamenti
                     const { data: myAppointments, error: myAppointmentsError } = await sbClient.from('appuntamenti').select('*, studente_id(nome), aula_id(nome)').eq('insegnante_id', currentUser.id);
                     if (myAppointmentsError) throw myAppointmentsError;
                     
@@ -167,18 +263,14 @@ async function initializeCalendar() {
                         title: `Lezione con ${apt.studente_id.nome}`,
                         start: apt.data_inizio,
                         end: apt.data_fine,
-                        extendedProps: {
-                            aula: apt.aula_id.nome,
-                            note: apt.note
-                        }
+                        extendedProps: { aula: apt.aula_id.nome, note: apt.note }
                     }));
 
-                    // 2. Carica gli slot occupati dagli altri
                     const { data: occupiedSlots, error: slotsError } = await sbClient.rpc('get_occupied_slots');
                     if (slotsError) throw slotsError;
                     
                     const occupiedEvents = occupiedSlots
-                        .filter(slot => slot.insegnante_id !== currentUser.id) // Escludi i tuoi slot
+                        .filter(slot => slot.insegnante_id !== currentUser.id) 
                         .map(slot => ({
                             title: 'Occupato',
                             start: slot.data_inizio,
@@ -200,13 +292,13 @@ async function initializeCalendar() {
     calendar.render();
 }
 
-// Ridisegna il calendario se la finestra viene ridimensionata
 window.addEventListener('resize', () => {
     if (calendar) {
-        // Un piccolo timeout per evitare di ridisegnare troppe volte
         setTimeout(() => {
-            calendar.destroy();
-            initializeCalendar();
+            if(calendar) { // Ricontrolla se esiste ancora dopo il timeout
+               calendar.destroy();
+               initializeCalendar();
+            }
         }, 250);
     }
 });
