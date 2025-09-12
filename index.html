@@ -3,28 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="./favicon.png">
     <title>Accademia Musicale - Registro Appuntamenti</title>
+    <link rel="icon" type="image/png" href="./favicon.png">
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Includiamo la libreria FullCalendar -->
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
-    <style>
-        body { transition: background-color 0.3s; }
-        /* Stili per gli eventi del calendario */
-        .fc-event-main {
-            cursor: pointer;
-        }
-        .occupied-slot {
-            background-color: #e5e7eb; /* Grigio chiaro */
-            border-color: #d1d5db;
-            color: #4b5563;
-        }
-    </style>
+    <style>body { transition: background-color 0.3s; }</style>
 </head>
 <body class="bg-gray-100">
 
-    <!-- SEZIONE LOGIN -->
-    <div id="login-section" class="flex items-center justify-center min-h-screen">
+    <!-- SEZIONE LOGIN (Già responsiva) -->
+    <div id="login-section" class="flex items-center justify-center min-h-screen p-4">
         <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
             <h2 class="text-2xl font-bold text-center text-gray-800">Accademia Musicale</h2>
             <p class="text-center text-gray-600">Accedi al registro appuntamenti</p>
@@ -48,32 +36,34 @@
     <!-- SEZIONE APP PRINCIPALE -->
     <div id="app-section" class="hidden">
         <header class="bg-white shadow-md">
-            <nav class="container mx-auto px-6 py-3 flex justify-between items-center">
-                <h1 class="text-xl font-bold text-indigo-600">Registro Appuntamenti</h1>
-                <div class="flex items-center space-x-4">
-                    <span id="user-email" class="text-sm text-gray-600"></span>
+            <nav class="container mx-auto px-4 sm:px-6 py-3 flex justify-between items-center">
+                <h1 class="text-lg sm:text-xl font-bold text-indigo-600">Registro Appuntamenti</h1>
+                <div class="flex items-center space-x-2 sm:space-x-4">
+                    <span id="user-email" class="text-xs sm:text-sm text-gray-600 truncate"></span>
                     <button id="logout-button" class="px-3 py-1 text-sm font-medium text-white bg-red-500 rounded-md hover:bg-red-600">Logout</button>
                 </div>
             </nav>
         </header>
-        <main class="container mx-auto p-6 flex">
-            <aside class="w-64 mr-8">
+
+        <!-- Contenitore principale ora è una colonna su mobile e una riga su desktop -->
+        <main class="container mx-auto p-4 sm:p-6 flex flex-col md:flex-row">
+            
+            <!-- La barra laterale ora occupa tutta la larghezza su mobile -->
+            <aside class="w-full md:w-64 mb-4 md:mb-0 md:mr-8 flex-shrink-0">
                 <nav id="app-navigation" class="space-y-2">
                     <a href="#" class="block px-4 py-2 text-gray-700 bg-gray-200 rounded-md font-bold">Calendario</a>
                     <a href="#" class="block px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-md">Appuntamenti & Note</a>
                 </nav>
             </aside>
-            <div id="content-area" class="w-full bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-2xl font-bold mb-4">Calendario Appuntamenti</h2>
-                <!-- Il calendario verrà renderizzato qui dal nostro JS -->
+            
+            <div id="content-area" class="w-full bg-white p-4 sm:p-6 rounded-lg shadow-md">
+                <h2 class="text-xl sm:text-2xl font-bold mb-4">Calendario Appuntamenti</h2>
                 <div id="calendar"></div>
             </div>
         </main>
     </div>
 
-    <!-- Il nostro script applicativo -->
     <script type="module" src="./app.js"></script>
-
 </body>
 </html>
 
