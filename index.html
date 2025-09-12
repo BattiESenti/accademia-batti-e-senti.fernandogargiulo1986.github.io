@@ -34,9 +34,8 @@
              background-color: #3730a3;
              border-color: #3730a3;
         }
-        /* Stile per la navigazione attiva */
         .nav-link.active {
-            background-color: #e5e7eb; /* Grigio chiaro */
+            background-color: #e5e7eb;
             font-weight: bold;
         }
     </style>
@@ -84,15 +83,14 @@
                 </nav>
             </aside>
             <div class="w-full">
-                <!-- Contenitore Vista Calendario -->
+                <!-- VISTA CALENDARIO -->
                 <div id="calendar-view" class="w-full bg-white p-4 md:p-6 rounded-lg shadow-md">
                     <h2 class="text-2xl font-bold mb-4">Calendario Appuntamenti</h2>
                     <div id="calendar"></div>
                 </div>
-                <!-- Contenitore Vista Amministrazione -->
+                <!-- VISTA AMMINISTRAZIONE -->
                 <div id="admin-view" class="w-full bg-white p-4 md:p-6 rounded-lg shadow-md hidden">
                     <h2 class="text-2xl font-bold mb-4">Pannello di Amministrazione</h2>
-                    <!-- Tabs per la navigazione -->
                     <div class="border-b border-gray-200 mb-4">
                         <nav class="-mb-px flex space-x-8" aria-label="Tabs">
                             <button id="tab-students" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-indigo-600 border-indigo-500">Studenti</button>
@@ -100,75 +98,59 @@
                             <button id="tab-classrooms" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 border-transparent">Aule</button>
                         </nav>
                     </div>
-                    <!-- Contenuto delle sezioni -->
+                    
                     <div id="admin-content-students">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th></tr></thead>
-                            <tbody id="students-table-body" class="bg-white divide-y divide-gray-200"></tbody>
-                        </table>
+                        <p class="text-sm text-gray-600 mb-4">Per aggiungere un nuovo studente, crearlo prima nella sezione Authentication di Supabase. Apparirà qui per la modifica.</p>
+                        <table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Azioni</th></tr></thead><tbody id="students-table-body" class="bg-white divide-y divide-gray-200"></tbody></table>
                     </div>
                     <div id="admin-content-teachers" class="hidden">
-                         <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th></tr></thead>
-                            <tbody id="teachers-table-body" class="bg-white divide-y divide-gray-200"></tbody>
-                        </table>
+                        <p class="text-sm text-gray-600 mb-4">Per aggiungere un nuovo insegnante, crearlo prima nella sezione Authentication di Supabase. Apparirà qui per la modifica.</p>
+                        <table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Azioni</th></tr></thead><tbody id="teachers-table-body" class="bg-white divide-y divide-gray-200"></tbody></table>
                     </div>
                     <div id="admin-content-classrooms" class="hidden">
-                         <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome Aula</th></tr></thead>
-                            <tbody id="classrooms-table-body" class="bg-white divide-y divide-gray-200"></tbody>
-                        </table>
+                        <div class="flex justify-end mb-4"><button id="add-classroom-btn" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700">Aggiungi Aula</button></div>
+                        <table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome Aula</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Azioni</th></tr></thead><tbody id="classrooms-table-body" class="bg-white divide-y divide-gray-200"></tbody></table>
                     </div>
                 </div>
             </div>
         </main>
     </div>
 
-    <!-- MODALE APPUNTAMENTO -->
-    <div id="appointment-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center">
+    <!-- MODALI -->
+    <div id="appointment-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
             <h3 id="modal-title" class="text-xl font-bold mb-4">Nuovo Appuntamento</h3>
             <form id="appointment-form">
                 <input type="hidden" id="appointment-id">
-                
-                <div class="mb-4">
-                    <label for="student-select" class="block text-sm font-medium text-gray-700">Studente</label>
-                    <select id="student-select" required class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></select>
-                </div>
-
-                <!-- Campo Insegnante (solo per Admin) -->
-                <div id="teacher-select-container" class="mb-4 hidden">
-                    <label for="teacher-select" class="block text-sm font-medium text-gray-700">Insegnante</label>
-                    <select id="teacher-select" required class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></select>
-                </div>
-
-                <div class="mb-4">
-                    <label for="classroom-select" class="block text-sm font-medium text-gray-700">Aula</label>
-                    <select id="classroom-select" required class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></select>
-                </div>
-
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700">Orario</label>
-                    <p id="appointment-time" class="mt-1 text-gray-800"></p>
-                </div>
-                
-                 <div class="mb-4">
-                    <label for="appointment-notes" class="block text-sm font-medium text-gray-700">Note</label>
-                    <textarea id="appointment-notes" rows="3" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></textarea>
-                </div>
-
+                <div class="mb-4"><label for="student-select" class="block text-sm font-medium text-gray-700">Studente</label><select id="student-select" required class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></select></div>
+                <div id="teacher-select-container" class="mb-4 hidden"><label for="teacher-select" class="block text-sm font-medium text-gray-700">Insegnante</label><select id="teacher-select" required class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></select></div>
+                <div class="mb-4"><label for="classroom-select" class="block text-sm font-medium text-gray-700">Aula</label><select id="classroom-select" required class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></select></div>
+                <div class="mb-4"><label class="block text-sm font-medium text-gray-700">Orario</label><p id="appointment-time" class="mt-1 text-gray-800"></p></div>
+                <div class="mb-4"><label for="appointment-notes" class="block text-sm font-medium text-gray-700">Note</label><textarea id="appointment-notes" rows="3" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></textarea></div>
                 <div class="mt-6 flex justify-between items-center">
-                    <div>
-                         <button id="delete-appointment-button" type="button" class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 hidden">Elimina</button>
-                    </div>
-                    <div class="space-x-2">
-                        <button id="cancel-modal-button" type="button" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">Annulla</button>
-                        <button id="save-appointment-button" type="submit" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700">Salva</button>
-                    </div>
+                    <div><button id="delete-appointment-button" type="button" class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 hidden">Elimina</button></div>
+                    <div class="space-x-2"><button id="cancel-modal-button" type="button" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">Annulla</button><button id="save-appointment-button" type="submit" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700">Salva</button></div>
                 </div>
             </form>
         </div>
     </div>
+    
+    <div id="admin-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h3 id="admin-modal-title" class="text-xl font-bold mb-4">Gestisci</h3>
+            <form id="admin-form">
+                <input type="hidden" id="admin-edit-id">
+                <input type="hidden" id="admin-edit-type">
+                <div class="mb-4"><label for="admin-input-name" class="block text-sm font-medium text-gray-700">Nome</label><input id="admin-input-name" type="text" required class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></div>
+                <div id="admin-input-email-container" class="mb-4"><label for="admin-input-email" class="block text-sm font-medium text-gray-700">Email (non modificabile)</label><input id="admin-input-email" type="email" readonly class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-gray-100 rounded-md shadow-sm"></div>
+                <div class="mt-6 flex justify-end space-x-2">
+                    <button id="admin-cancel-button" type="button" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">Annulla</button>
+                    <button id="admin-save-button" type="submit" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700">Salva</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 
     <script type="module" src="./app.js"></script>
 </body>
