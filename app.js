@@ -339,7 +339,7 @@ async function handleAdminFormSubmit(event) {
         }
     } else { // --- CREATE MODE ---
         if (type === 'students' || type === 'teachers') {
-            const email = adminInputEmail.value;
+            const email = adminInputEmail.value.trim();
             const password = adminInputPassword.value;
             
             // Salva la sessione corrente dell'admin
