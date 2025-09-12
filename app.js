@@ -342,34 +342,35 @@ async function handleAdminFormSubmit(event) {
             const email = adminInputEmail.value.trim();
             const password = adminInputPassword.value;
             
-            // Salva la sessione corrente dell'admin
+            // 1. Salva la sessione corrente dell'admin
             const { data: { session: adminSession }, error: sessionError } = await sbClient.auth.getSession();
-             if (sessionError) {
-                alert('Errore di sessione, impossibile creare utente.');
+             if (sessionError || !adminSession) {
+                alert('Errore di sessione, impossibile creare utente. Riprovare il login.');
                 return;
             }
 
-            // Crea il nuovo utente (questo fa il logout dell'admin temporaneamente)
-            const { data: newUser, error: signUpError } = await sbClient.auth.signUp({
-                email,
-                password,
-                options: {
-                    data: {
-                        nome: name,
-                        ruolo: type === 'students' ? 'student' : 'teacher'
-                    }
-                }
-            });
+            // 2. Crea il nuovo utente (questo fa il logout dell'admin temporaneamente)
+            const { data: { user: newUser }, error: signUpError } = await sbClient.auth.signUp({ email, password });
 
             if (signUpError) {
                 error = signUpError;
-            } else {
-                 // Ripristina la sessione dell'admin
-                const { error: restoreError } = await sbClient.auth.setSession(adminSession);
-                if(restoreError) {
-                    alert('Nuovo utente creato, ma si è verificato un errore nel ripristino della sessione admin. Si prega di effettuare nuovamente il login.');
-                    await sbClient.auth.signOut();
-                    showLoginScreen();
+            } else if (newUser) {
+                // 3. Aggiorna il profilo del nuovo utente con nome e ruolo corretto
+                const newRole = type === 'students' ? 'student' : 'teacher';
+                const { error: updateError } = await sbClient.from('profiles')
+                    .update({ nome: name, ruolo: newRole })
+                    .eq('id', newUser.id);
+
+                if (updateError) {
+                    error = { message: `Utente creato, ma errore nell'aggiornare il profilo: ${updateError.message}` };
+                } else {
+                    // 4. Ripristina la sessione dell'admin
+                    const { error: restoreError } = await sbClient.auth.setSession(adminSession);
+                    if(restoreError) {
+                        alert('Nuovo utente creato, ma si è verificato un errore nel ripristino della sessione. Si prega di effettuare nuovamente il login.');
+                        await sbClient.auth.signOut();
+                        showLoginScreen();
+                    }
                 }
             }
         } else if (type === 'classrooms') {
