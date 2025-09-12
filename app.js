@@ -109,17 +109,20 @@ async function initializeCalendar() {
         calendar.destroy();
     }
 
+    const isMobile = window.innerWidth < 768;
+
     calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'timeGridWeek',
+        initialView: isMobile ? 'timeGridDay' : 'timeGridWeek',
         headerToolbar: {
-            left: 'prev, next, today',
+            left: 'prev,next today',
             center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay'
+            right: isMobile ? 'timeGridDay,timeGridWeek' : 'dayGridMonth,timeGridWeek,timeGridDay'
         },
         locale: 'it',
         slotMinTime: '08:00:00',
         slotMaxTime: '21:00:00',
         allDaySlot: false,
+        height: 'auto', // Migliora la gestione dell'altezza su mobile
         events: async (fetchInfo, successCallback, failureCallback) => {
             try {
                 let allEvents = [];
@@ -196,6 +199,18 @@ async function initializeCalendar() {
 
     calendar.render();
 }
+
+// Ridisegna il calendario se la finestra viene ridimensionata
+window.addEventListener('resize', () => {
+    if (calendar) {
+        // Un piccolo timeout per evitare di ridisegnare troppe volte
+        setTimeout(() => {
+            calendar.destroy();
+            initializeCalendar();
+        }, 250);
+    }
+});
+
 
 // --- AVVIO APPLICAZIONE ---
 checkUserSession();
