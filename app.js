@@ -18,7 +18,7 @@ const appNavigation = document.getElementById('app-navigation');
 const calendarView = document.getElementById('calendar-view');
 const adminView = document.getElementById('admin-view');
 
-// Elementi del modale
+// Modale Appuntamenti
 const modal = document.getElementById('appointment-modal');
 const modalTitle = document.getElementById('modal-title');
 const appointmentForm = document.getElementById('appointment-form');
@@ -33,7 +33,20 @@ const saveButton = document.getElementById('save-appointment-button');
 const cancelButton = document.getElementById('cancel-modal-button');
 const deleteButton = document.getElementById('delete-appointment-button');
 
+// Modale Admin
+const adminModal = document.getElementById('admin-modal');
+const adminModalTitle = document.getElementById('admin-modal-title');
+const adminForm = document.getElementById('admin-form');
+const adminEditId = document.getElementById('admin-edit-id');
+const adminEditType = document.getElementById('admin-edit-type');
+const adminInputName = document.getElementById('admin-input-name');
+const adminInputEmailContainer = document.getElementById('admin-input-email-container');
+const adminInputEmail = document.getElementById('admin-input-email');
+const adminCancelButton = document.getElementById('admin-cancel-button');
+const adminSaveButton = document.getElementById('admin-save-button');
+
 // Elementi Admin
+const addClassroomBtn = document.getElementById('add-classroom-btn');
 const adminTabs = {
     students: document.getElementById('tab-students'),
     teachers: document.getElementById('tab-teachers'),
@@ -49,7 +62,6 @@ const tableBodies = {
     teachers: document.getElementById('teachers-table-body'),
     classrooms: document.getElementById('classrooms-table-body'),
 };
-
 
 // --- VARIABILI GLOBALI DI STATO ---
 let calendar;
@@ -107,16 +119,14 @@ async function loadUserDataAndRenderUI(user) {
     currentUserRole = profile.ruolo;
     updateNavigation(profile.ruolo);
     initializeCalendar(user, profile.ruolo);
-    showView('calendar'); // Mostra il calendario di default
+    showView('calendar');
     console.log(`Utente loggato con ruolo: ${profile.ruolo}`);
 }
 
 function updateNavigation(role) {
-    // Rimuovi link admin esistente se c'è
     const existingAdminLink = document.getElementById('nav-admin');
     if (existingAdminLink) existingAdminLink.remove();
 
-    // Aggiungi link admin se l'utente è admin
     if (role === 'admin') {
         const adminLink = document.createElement('a');
         adminLink.href = '#';
@@ -125,8 +135,6 @@ function updateNavigation(role) {
         adminLink.textContent = 'Amministrazione';
         appNavigation.appendChild(adminLink);
     }
-    
-    // Aggiungi event listeners per la navigazione
     setupEventListeners();
 }
 
@@ -144,14 +152,10 @@ async function checkUserSession() {
 // --- GESTIONE VISTE E NAVIGAZIONE ---
 
 function showView(viewName) {
-    // Nascondi tutte le viste
     calendarView.classList.add('hidden');
     adminView.classList.add('hidden');
-
-    // Rimuovi la classe 'active' da tutti i link di navigazione
     document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
 
-    // Mostra la vista richiesta e imposta il link attivo
     if (viewName === 'calendar') {
         calendarView.classList.remove('hidden');
         document.getElementById('nav-calendar').classList.add('active');
@@ -159,7 +163,7 @@ function showView(viewName) {
         adminView.classList.remove('hidden');
         const adminLink = document.getElementById('nav-admin');
         if (adminLink) adminLink.classList.add('active');
-        loadAdminData(); // Carica i dati quando la vista viene mostrata
+        loadAdminData();
     }
 }
 
@@ -177,51 +181,50 @@ function setupEventListeners() {
         });
     }
 
-    // Aggiungi listener per i tab del pannello admin
     Object.keys(adminTabs).forEach(key => {
         adminTabs[key].addEventListener('click', () => showAdminTab(key));
     });
+
+    Object.values(tableBodies).forEach(tbody => {
+        tbody.addEventListener('click', handleAdminTableClick);
+    });
+    
+    addClassroomBtn.addEventListener('click', () => openAdminModal('classroom'));
+    adminForm.addEventListener('submit', handleAdminFormSubmit);
+    adminCancelButton.addEventListener('click', closeAdminModal);
 }
 
 // --- LOGICA PANNELLO DI AMMINISTRAZIONE ---
 
 function showAdminTab(tabName) {
-    // Gestione stile tab
     Object.values(adminTabs).forEach(tab => {
         tab.classList.remove('text-indigo-600', 'border-indigo-500');
         tab.classList.add('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300', 'border-transparent');
     });
     adminTabs[tabName].classList.add('text-indigo-600', 'border-indigo-500');
-    adminTabs[tabName].classList.remove('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300', 'border-transparent');
+    adminTabs[tabName].classList.remove('text-gray-500');
 
-    // Gestione visualizzazione contenuto
     Object.values(adminContents).forEach(content => content.classList.add('hidden'));
     adminContents[tabName].classList.remove('hidden');
 }
 
-
 async function loadAdminData() {
-    // Carica e renderizza studenti
-    const { data: students, error: studentsError } = await sbClient.from('profiles').select('id, nome, email').eq('ruolo', 'student');
-    if(studentsError) console.error("Errore caricamento studenti:", studentsError);
-    else renderTable(tableBodies.students, students, ['nome', 'email']);
+    const { data: students, error: sError } = await sbClient.from('profiles').select('id, nome, email').eq('ruolo', 'student');
+    if(sError) console.error("Errore caricamento studenti:", sError); else renderTable('students', students, ['nome', 'email']);
 
-    // Carica e renderizza insegnanti
-    const { data: teachers, error: teachersError } = await sbClient.from('profiles').select('id, nome, email').eq('ruolo', 'teacher');
-    if(teachersError) console.error("Errore caricamento insegnanti:", teachersError);
-    else renderTable(tableBodies.teachers, teachers, ['nome', 'email']);
+    const { data: teachers, error: tError } = await sbClient.from('profiles').select('id, nome, email').eq('ruolo', 'teacher');
+    if(tError) console.error("Errore caricamento insegnanti:", tError); else renderTable('teachers', teachers, ['nome', 'email']);
 
-    // Carica e renderizza aule
-    const { data: classrooms, error: classroomsError } = await sbClient.from('aule').select('id, nome');
-    if(classroomsError) console.error("Errore caricamento aule:", classroomsError);
-    else renderTable(tableBodies.classrooms, classrooms, ['nome']);
+    const { data: classrooms, error: cError } = await sbClient.from('aule').select('id, nome');
+    if(cError) console.error("Errore caricamento aule:", cError); else renderTable('classrooms', classrooms, ['nome']);
 }
 
-function renderTable(tbody, data, columns) {
-    tbody.innerHTML = ''; // Pulisci la tabella
+function renderTable(type, data, columns) {
+    const tbody = tableBodies[type];
+    tbody.innerHTML = '';
     if (data.length === 0) {
-        const row = `<tr><td colspan="${columns.length}" class="px-6 py-4 text-center text-gray-500">Nessun dato disponibile.</td></tr>`;
-        tbody.innerHTML = row;
+        const colspan = columns.length + 1;
+        tbody.innerHTML = `<tr><td colspan="${colspan}" class="px-6 py-4 text-center text-gray-500">Nessun dato disponibile.</td></tr>`;
         return;
     }
     data.forEach(item => {
@@ -232,8 +235,102 @@ function renderTable(tbody, data, columns) {
             cell.textContent = item[col] || '-';
             row.appendChild(cell);
         });
+        const actionsCell = document.createElement('td');
+        actionsCell.className = 'px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2';
+        actionsCell.innerHTML = `
+            <button class="text-indigo-600 hover:text-indigo-900 admin-edit-btn" data-id="${item.id}" data-type="${type}" data-name="${item.nome || ''}" data-email="${item.email || ''}">Modifica</button>
+            <button class="text-red-600 hover:text-red-900 admin-delete-btn" data-id="${item.id}" data-type="${type}" data-name="${item.nome || item.email}">Elimina</button>
+        `;
+        row.appendChild(actionsCell);
         tbody.appendChild(row);
     });
+}
+
+function handleAdminTableClick(event) {
+    const target = event.target;
+    if (target.classList.contains('admin-edit-btn')) {
+        const { id, type, name, email } = target.dataset;
+        openAdminModal(type, { id, nome: name, email });
+    }
+    if (target.classList.contains('admin-delete-btn')) {
+        const { id, type, name } = target.dataset;
+        handleAdminDelete(id, type, name);
+    }
+}
+
+async function handleAdminDelete(id, type, name) {
+    const confirmMessage = `Sei sicuro di voler eliminare "${name}"? Questa azione è irreversibile.`;
+    if (!window.confirm(confirmMessage)) return;
+
+    let error;
+    if (type === 'students' || type === 'teachers') {
+        const { error: deleteError } = await sbClient.from('profiles').delete().eq('id', id);
+        error = deleteError;
+        // Nota: questo elimina solo il profilo, non l'utente da Supabase Auth.
+        // Per una pulizia completa, l'utente dovrebbe essere eliminato anche dalla sezione Authentication.
+    } else if (type === 'classrooms') {
+        const { error: deleteError } = await sbClient.from('aule').delete().eq('id', id);
+        error = deleteError;
+    }
+
+    if (error) {
+        alert(`Errore durante l'eliminazione: ${error.message}`);
+    } else {
+        loadAdminData();
+    }
+}
+
+function openAdminModal(type, item = null) {
+    adminForm.reset();
+    adminEditId.value = item ? item.id : '';
+    adminEditType.value = type;
+
+    if (type === 'students' || type === 'teachers') {
+        adminModalTitle.textContent = `Modifica ${type === 'students' ? 'Studente' : 'Insegnante'}`;
+        adminInputName.value = item ? item.nome : '';
+        adminInputEmail.value = item ? item.email : '';
+        adminInputEmailContainer.classList.remove('hidden');
+    } else if (type === 'classrooms') {
+        adminModalTitle.textContent = item ? 'Modifica Aula' : 'Nuova Aula';
+        adminInputName.value = item ? item.nome : '';
+        adminInputEmailContainer.classList.add('hidden');
+    }
+    
+    adminModal.classList.remove('hidden');
+    adminModal.classList.add('flex');
+}
+
+function closeAdminModal() {
+    adminModal.classList.add('hidden');
+    adminModal.classList.remove('flex');
+}
+
+async function handleAdminFormSubmit(event) {
+    event.preventDefault();
+    const id = adminEditId.value;
+    const type = adminEditType.value;
+    const name = adminInputName.value;
+
+    let error;
+    if (type === 'students' || type === 'teachers') {
+        const { error: updateError } = await sbClient.from('profiles').update({ nome: name }).eq('id', id);
+        error = updateError;
+    } else if (type === 'classrooms') {
+        if (id) { // Modifica
+            const { error: updateError } = await sbClient.from('aule').update({ nome: name }).eq('id', id);
+            error = updateError;
+        } else { // Creazione
+            const { error: insertError } = await sbClient.from('aule').insert({ nome: name });
+            error = insertError;
+        }
+    }
+
+    if (error) {
+        alert(`Errore nel salvataggio: ${error.message}`);
+    } else {
+        closeAdminModal();
+        loadAdminData();
+    }
 }
 
 
@@ -241,119 +338,63 @@ function renderTable(tbody, data, columns) {
 
 async function fetchEvents(user, role) {
     let allEvents = [];
-
-    let query;
     const selectString = '*, studente_id(id, nome), insegnante_id(id, nome), aula_id(id, nome)';
 
-    if (role === 'admin') {
-        query = sbClient.from('appuntamenti').select(selectString);
-    } else if (role === 'student') {
-        query = sbClient.from('appuntamenti').select(selectString).eq('studente_id', user.id);
-    } else { // 'teacher'
-        query = sbClient.from('appuntamenti').select(selectString).eq('insegnante_id', user.id);
-    }
+    let query = (role === 'admin') ? sbClient.from('appuntamenti').select(selectString)
+              : (role === 'student') ? sbClient.from('appuntamenti').select(selectString).eq('studente_id', user.id)
+              : sbClient.from('appuntamenti').select(selectString).eq('insegnante_id', user.id);
     
     const { data, error } = await query;
-    if (error) {
-        console.error("Errore nel caricare gli appuntamenti:", error);
-        return [];
-    }
+    if (error) { console.error("Errore nel caricare gli appuntamenti:", error); return []; }
 
-    const mainEvents = data.map(apt => ({
+    allEvents.push(...data.map(apt => ({
         id: apt.id,
-        title: `${apt.studente_id.nome} con ${apt.insegnante_id.nome}`,
-        start: apt.data_inizio,
-        end: apt.data_fine,
+        title: `${apt.studente_id?.nome || '?'} con ${apt.insegnante_id?.nome || '?'}`,
+        start: apt.data_inizio, end: apt.data_fine,
         extendedProps: {
             notes: apt.note,
-            studentId: apt.studente_id.id,
-            teacherId: apt.insegnante_id.id,
-            classroomId: apt.aula_id.id,
-            studentName: apt.studente_id.nome,
-            teacherName: apt.insegnante_id.nome,
-            classroomName: apt.aula_id.nome,
+            studentId: apt.studente_id?.id, teacherId: apt.insegnante_id?.id, classroomId: apt.aula_id?.id
         }
-    }));
-    allEvents.push(...mainEvents);
+    })));
 
     if (role === 'teacher') {
-        const { data: occupied, error: occupiedError } = await sbClient.rpc('get_occupied_slots');
-        if (occupiedError) {
-            console.error("Errore nel caricare gli slot occupati:", occupiedError);
-        } else {
-            const occupiedEvents = occupied
-                .filter(slot => slot.insegnante_id !== user.id) 
-                .map(slot => ({
-                    title: 'Occupato',
-                    start: slot.data_inizio,
-                    end: slot.data_fine,
-                    display: 'background',
-                    color: '#e5e7eb'
-                }));
-            allEvents.push(...occupiedEvents);
+        const { data: occupied, error: rpcError } = await sbClient.rpc('get_occupied_slots');
+        if (rpcError) { console.error("Errore slot occupati:", rpcError); }
+        else {
+            allEvents.push(...occupied.filter(s => s.insegnante_id !== user.id).map(s => ({
+                title: 'Occupato', start: s.data_inizio, end: s.data_fine, display: 'background', color: '#e5e7eb'
+            })));
         }
     }
-    
     return allEvents;
 }
 
-
 function initializeCalendar(user, role) {
     const calendarEl = document.getElementById('calendar');
-    if (calendar) {
-        calendar.destroy();
-    }
-
+    if (calendar) calendar.destroy();
     const isEditable = role === 'admin' || role === 'teacher';
 
     calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'timeGridWeek',
-        headerToolbar: {
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay'
-        },
-        locale: 'it',
-        slotMinTime: '08:00:00',
-        slotMaxTime: '21:00:00',
-        allDaySlot: false,
-        selectable: isEditable,
-        editable: isEditable,
-        events: (fetchInfo, successCallback, failureCallback) => {
-            fetchEvents(user, role)
-                .then(events => successCallback(events))
-                .catch(error => failureCallback(error));
-        },
-        select: (info) => {
-            if (!isEditable) return;
-            newAppointmentInfo = info;
-            openModalForNew();
-        },
-        eventClick: (info) => {
-            if (info.event.display === 'background') return;
-            openModalForEdit(info.event);
-        }
+        headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' },
+        locale: 'it', slotMinTime: '08:00:00', slotMaxTime: '21:00:00', allDaySlot: false,
+        selectable: isEditable, editable: isEditable,
+        events: (info, success, fail) => fetchEvents(user, role).then(success).catch(fail),
+        select: (info) => { if (isEditable) { newAppointmentInfo = info; openModalForNew(); } },
+        eventClick: (info) => { if (info.event.display !== 'background') openModalForEdit(info.event); }
     });
-
     calendar.render();
 }
 
-
-// --- LOGICA DEL MODALE ---
+// --- LOGICA MODALE APPUNTAMENTI ---
 
 async function openModalForNew() {
     appointmentForm.reset();
     modalTitle.textContent = 'Nuovo Appuntamento';
     appointmentIdInput.value = '';
     deleteButton.classList.add('hidden');
-
-    if (currentUserRole === 'admin') {
-        teacherSelectContainer.classList.remove('hidden');
-        teacherSelect.required = true;
-    } else {
-        teacherSelectContainer.classList.add('hidden');
-        teacherSelect.required = false;
-    }
+    teacherSelectContainer.style.display = (currentUserRole === 'admin') ? '' : 'none';
+    teacherSelect.required = (currentUserRole === 'admin');
 
     const { start, end } = newAppointmentInfo;
     appointmentTime.textContent = `${start.toLocaleDateString('it-IT')} dalle ${start.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})} alle ${end.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})}`;
@@ -366,20 +407,11 @@ async function openModalForNew() {
 async function openModalForEdit(event) {
     appointmentForm.reset();
     modalTitle.textContent = 'Dettagli Appuntamento';
+    teacherSelectContainer.style.display = (currentUserRole === 'admin') ? '' : 'none';
+    teacherSelect.required = (currentUserRole === 'admin');
     
-    if (currentUserRole === 'admin') {
-        teacherSelectContainer.classList.remove('hidden');
-        teacherSelect.required = true;
-    } else {
-        teacherSelectContainer.classList.add('hidden');
-        teacherSelect.required = false;
-    }
-
-    if(currentUserRole === 'admin' || (currentUserRole === 'teacher' && event.extendedProps.teacherId === currentUser.id)) {
-        deleteButton.classList.remove('hidden');
-    } else {
-        deleteButton.classList.add('hidden');
-    }
+    const canDelete = currentUserRole === 'admin' || (currentUserRole === 'teacher' && event.extendedProps.teacherId === currentUser.id);
+    deleteButton.style.display = canDelete ? '' : 'none';
 
     const { start, end, extendedProps, id } = event;
     appointmentIdInput.value = id;
@@ -387,58 +419,32 @@ async function openModalForEdit(event) {
     appointmentNotes.value = extendedProps.notes || '';
     
     await populateSelects(extendedProps.studentId, extendedProps.classroomId, extendedProps.teacherId);
-
     modal.classList.remove('hidden');
     modal.classList.add('flex');
 }
 
-
 async function populateSelects(selectedStudentId = null, selectedClassroomId = null, selectedTeacherId = null) {
-    // Popola studenti
-    const { data: students, error: studentsError } = await sbClient.from('profiles').select('id, nome').eq('ruolo', 'student');
-    if (studentsError) console.error("Errore nel caricare gli studenti:", studentsError);
-    else {
-        studentSelect.innerHTML = '<option value="">Seleziona uno studente</option>';
-        students.forEach(s => {
+    const populate = async (element, query, nameCol) => {
+        const { data, error } = await query;
+        if (error) { console.error(`Errore caricamento ${nameCol}:`, error); return; }
+        element.innerHTML = `<option value="">Seleziona...</option>`;
+        data.forEach(item => {
             const option = document.createElement('option');
-            option.value = s.id;
-            option.textContent = s.nome;
-            if (s.id === selectedStudentId) option.selected = true;
-            studentSelect.appendChild(option);
+            option.value = item.id;
+            option.textContent = item[nameCol];
+            element.appendChild(option);
         });
-    }
-    
-    // Popola insegnanti (se l'utente è admin)
+    };
+    await populate(studentSelect, sbClient.from('profiles').select('id, nome').eq('ruolo', 'student'), 'nome');
     if (currentUserRole === 'admin') {
-        const { data: teachers, error: teachersError } = await sbClient.from('profiles').select('id, nome').eq('ruolo', 'teacher');
-        if (teachersError) console.error("Errore nel caricare gli insegnanti:", teachersError);
-        else {
-            teacherSelect.innerHTML = '<option value="">Seleziona un insegnante</option>';
-            teachers.forEach(t => {
-                const option = document.createElement('option');
-                option.value = t.id;
-                option.textContent = t.nome;
-                if (t.id === selectedTeacherId) option.selected = true;
-                teacherSelect.appendChild(option);
-            });
-        }
+        await populate(teacherSelect, sbClient.from('profiles').select('id, nome').eq('ruolo', 'teacher'), 'nome');
     }
+    await populate(classroomSelect, sbClient.from('aule').select('id, nome'), 'nome');
 
-    // Popola aule
-    const { data: classrooms, error: classroomsError } = await sbClient.from('aule').select('id, nome');
-    if (classroomsError) console.error("Errore nel caricare le aule:", classroomsError);
-    else {
-        classroomSelect.innerHTML = '<option value="">Seleziona un\'aula</option>';
-        classrooms.forEach(c => {
-            const option = document.createElement('option');
-            option.value = c.id;
-            option.textContent = c.nome;
-            if (c.id === selectedClassroomId) option.selected = true;
-            classroomSelect.appendChild(option);
-        });
-    }
+    studentSelect.value = selectedStudentId || '';
+    classroomSelect.value = selectedClassroomId || '';
+    if (currentUserRole === 'admin') teacherSelect.value = selectedTeacherId || '';
 }
-
 
 function closeModal() {
     modal.classList.add('hidden');
