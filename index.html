@@ -12,9 +12,8 @@
     
     <style>
         body { transition: background-color 0.3s; }
-        /* Stili per allineare i bottoni di FullCalendar con Tailwind */
         .fc .fc-button {
-            background-color: #4f46e5; /* bg-indigo-600 */
+            background-color: #4f46e5;
             border-color: #4f46e5;
             color: white;
             padding: 0.5rem 1rem;
@@ -24,7 +23,7 @@
             transition: background-color 0.2s;
         }
         .fc .fc-button:hover {
-            background-color: #4338ca; /* bg-indigo-700 */
+            background-color: #4338ca;
         }
         .fc .fc-button:focus {
             outline: none;
@@ -32,7 +31,7 @@
         }
         .fc .fc-button-primary:not(:disabled).fc-button-active, 
         .fc .fc-button-primary:not(:disabled):active {
-             background-color: #3730a3; /* bg-indigo-800 */
+             background-color: #3730a3;
              border-color: #3730a3;
         }
     </style>
@@ -96,6 +95,12 @@
                 <div class="mb-4">
                     <label for="student-select" class="block text-sm font-medium text-gray-700">Studente</label>
                     <select id="student-select" required class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></select>
+                </div>
+
+                <!-- Campo Insegnante (solo per Admin) -->
+                <div id="teacher-select-container" class="mb-4 hidden">
+                    <label for="teacher-select" class="block text-sm font-medium text-gray-700">Insegnante</label>
+                    <select id="teacher-select" required class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></select>
                 </div>
 
                 <div class="mb-4">
