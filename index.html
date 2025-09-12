@@ -34,6 +34,11 @@
              background-color: #3730a3;
              border-color: #3730a3;
         }
+        /* Stile per la navigazione attiva */
+        .nav-link.active {
+            background-color: #e5e7eb; /* Grigio chiaro */
+            font-weight: bold;
+        }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -74,13 +79,47 @@
         <main class="container mx-auto p-4 md:p-6 flex flex-col md:flex-row">
             <aside class="w-full md:w-64 md:mr-8 mb-4 md:mb-0 flex-shrink-0">
                 <nav id="app-navigation" class="space-y-2">
-                    <a href="#" class="block px-4 py-2 text-gray-700 bg-gray-200 rounded-md font-bold">Calendario</a>
-                    <a href="#" class="block px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-md">Appuntamenti & Note</a>
+                    <a href="#" id="nav-calendar" class="nav-link block px-4 py-2 text-gray-700 rounded-md">Calendario</a>
+                    <a href="#" id="nav-notes" class="nav-link block px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-md">Appuntamenti & Note</a>
                 </nav>
             </aside>
-            <div id="content-area" class="w-full bg-white p-4 md:p-6 rounded-lg shadow-md">
-                <h2 class="text-2xl font-bold mb-4">Calendario Appuntamenti</h2>
-                <div id="calendar"></div>
+            <div class="w-full">
+                <!-- Contenitore Vista Calendario -->
+                <div id="calendar-view" class="w-full bg-white p-4 md:p-6 rounded-lg shadow-md">
+                    <h2 class="text-2xl font-bold mb-4">Calendario Appuntamenti</h2>
+                    <div id="calendar"></div>
+                </div>
+                <!-- Contenitore Vista Amministrazione -->
+                <div id="admin-view" class="w-full bg-white p-4 md:p-6 rounded-lg shadow-md hidden">
+                    <h2 class="text-2xl font-bold mb-4">Pannello di Amministrazione</h2>
+                    <!-- Tabs per la navigazione -->
+                    <div class="border-b border-gray-200 mb-4">
+                        <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                            <button id="tab-students" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-indigo-600 border-indigo-500">Studenti</button>
+                            <button id="tab-teachers" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 border-transparent">Insegnanti</button>
+                            <button id="tab-classrooms" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 border-transparent">Aule</button>
+                        </nav>
+                    </div>
+                    <!-- Contenuto delle sezioni -->
+                    <div id="admin-content-students">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th></tr></thead>
+                            <tbody id="students-table-body" class="bg-white divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                    <div id="admin-content-teachers" class="hidden">
+                         <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th></tr></thead>
+                            <tbody id="teachers-table-body" class="bg-white divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                    <div id="admin-content-classrooms" class="hidden">
+                         <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome Aula</th></tr></thead>
+                            <tbody id="classrooms-table-body" class="bg-white divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
