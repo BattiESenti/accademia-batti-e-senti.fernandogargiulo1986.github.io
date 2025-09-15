@@ -368,6 +368,16 @@ function closeAdminModal() {
     adminModal.classList.remove('flex');
 }
 
+// Funzione helper per attendere la creazione del profilo via trigger
+async function waitForProfile(userId, retries = 5, delay = 400) {
+    for (let i = 0; i < retries; i++) {
+        const { data } = await sbClient.from('profiles').select('id').eq('id', userId).single();
+        if (data) return data; // Profilo trovato
+        await new Promise(res => setTimeout(res, delay));
+    }
+    return null; // Profilo non trovato dopo i tentativi
+}
+
 async function handleAdminFormSubmit(event) {
     event.preventDefault();
     adminFormError.textContent = '';
@@ -395,15 +405,24 @@ async function handleAdminFormSubmit(event) {
             }
             const { data: { session: adminSession } } = await sbClient.auth.getSession();
             const { data: { user: newUser }, error: signUpError } = await sbClient.auth.signUp({ email, password });
-            await sbClient.auth.setSession(adminSession);
-
+            
             if (signUpError) {
                 error = signUpError;
             } else if (newUser) {
-                const newRole = type === 'students' ? 'student' : 'teacher';
-                const { error: updateError } = await sbClient.from('profiles').update({ nome: name, ruolo: newRole }).eq('id', newUser.id);
-                if (updateError) error = { message: `Utente creato, ma errore nell'aggiornare il profilo: ${updateError.message}` };
+                // Attendi che il trigger crei il profilo
+                const profileExists = await waitForProfile(newUser.id);
+                if (!profileExists) {
+                    error = { message: "Il profilo utente non è stato creato automaticamente. Riprova o contatta il supporto." };
+                } else {
+                    const newRole = type === 'students' ? 'student' : 'teacher';
+                    const { error: updateError } = await sbClient.from('profiles').update({ nome: name, ruolo: newRole }).eq('id', newUser.id);
+                    if (updateError) {
+                        error = { message: `Utente creato, ma errore nell'aggiornare il profilo: ${updateError.message}` };
+                    }
+                }
             }
+            // Ripristina sempre la sessione admin alla fine
+            await sbClient.auth.setSession(adminSession);
         }
     }
 
@@ -539,11 +558,13 @@ async function openModalForEdit(event) {
         [appointmentStudentName, appointmentTeacherName].forEach(el => { el.style.display = 'none'; });
         await populateAppointmentSelects(extendedProps.studente_id?.id, extendedProps.aula_id?.id, extendedProps.insegnante_id?.id);
         teacherSelect.disabled = currentUserRole === 'teacher';
+        appointmentNotes.readOnly = false;
+
     } else { // Vista solo lettura per studenti
         [studentSelect, teacherSelect, classroomSelect].forEach(el => { el.style.display = 'none'; });
         [appointmentStudentName, appointmentTeacherName].forEach(el => { el.style.display = 'block'; });
-        appointmentStudentName.textContent = extendedProps.studente_id?.nome || 'N/D';
-        appointmentTeacherName.textContent = extendedProps.insegnante_id?.nome || 'N/D';
+        appointmentStudentName.textContent = `Studente: ${extendedProps.studente_id?.nome || 'N/D'}`;
+        appointmentTeacherName.textContent = `Insegnante: ${extendedProps.insegnante_id?.nome || 'N/D'}`;
         appointmentNotes.readOnly = true;
     }
 
@@ -580,6 +601,13 @@ cancelButton.addEventListener('click', closeModal);
 
 appointmentForm.addEventListener('submit', async (event) => {
     event.preventDefault();
+
+    // Se l'utente non può modificare, esci subito
+    if (appointmentNotes.readOnly) {
+        closeModal();
+        return;
+    }
+
     const id = appointmentIdInput.value;
     const appointmentData = {
         studente_id: studentSelect.value,
@@ -612,4 +640,3 @@ deleteButton.addEventListener('click', async () => {
 
 // --- INIZIALIZZAZIONE ---
 checkUserSession();
-
