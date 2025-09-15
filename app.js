@@ -4,7 +4,6 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const SUPABASE_URL = 'https://nxkcnjzkjboorltirjad.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54a2NuanpramJvb3JsdGlyamFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4MDkyNzAsImV4cCI6MjA3MjM4NTI3MH0.E1tK4QOlhpTPMtmYLRZtTvDy5QT_wej25cZAMkBh4CM';
 
-
 const sbClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // --- RIFERIMENTI AGLI ELEMENTI DEL DOM ---
@@ -335,33 +334,44 @@ async function openAdminModal(type, item = null) {
     adminModalTitle.textContent = `${item ? 'Modifica' : 'Nuovo'} ${type.slice(0, -1)}`;
 
     const isProfile = type === 'students' || type === 'teachers';
-    adminInputEmailContainer.style.display = isProfile ? '' : 'none';
-    adminInputPasswordContainer.style.display = isProfile && !item ? '' : 'none';
-    adminDefaultClassroomContainer.style.display = type === 'teachers' && item ? '' : 'none';
-    
-    if(item) {
+    const isCreating = !item;
+
+    // Gestione visibilità con classList (corretto per Tailwind)
+    adminInputEmailContainer.classList.toggle('hidden', !isProfile);
+    adminInputPasswordContainer.classList.toggle('hidden', !(isProfile && isCreating));
+    adminDefaultClassroomContainer.classList.toggle('hidden', !(type === 'teachers' && !isCreating));
+
+    // Gestione dinamica dell'attributo 'required'
+    adminInputEmail.required = isProfile && isCreating;
+    adminInputPassword.required = isProfile && isCreating;
+
+    if (item) { // Modal in modalità MODIFICA
         adminInputName.value = item.nome;
-        if(isProfile) adminInputEmail.value = item.email;
-        adminInputEmail.readOnly = true;
-    } else {
-         adminInputEmail.readOnly = false;
-    }
-    
-    if(type === 'teachers' && item) {
-        const { data: aule } = await sbClient.from('aule').select('id, nome');
-        adminDefaultClassroomSelect.innerHTML = '<option value="">Nessuna</option>';
-        aule.forEach(a => {
-            const option = document.createElement('option');
-            option.value = a.id;
-            option.textContent = a.nome;
-            if(item.aula_default_id === a.id) option.selected = true;
-            adminDefaultClassroomSelect.appendChild(option);
-        });
+        if (isProfile) {
+            adminInputEmail.value = item.email;
+            adminInputEmail.readOnly = true;
+        }
+        if (type === 'teachers') {
+            const { data: aule } = await sbClient.from('aule').select('id, nome');
+            adminDefaultClassroomSelect.innerHTML = '<option value="">Nessuna</option>';
+            aule.forEach(a => {
+                const option = document.createElement('option');
+                option.value = a.id;
+                option.textContent = a.nome;
+                if (item.aula_default_id === a.id) option.selected = true;
+                adminDefaultClassroomSelect.appendChild(option);
+            });
+        }
+    } else { // Modal in modalità CREAZIONE
+        if (isProfile) {
+            adminInputEmail.readOnly = false;
+        }
     }
 
     adminModal.classList.remove('hidden');
     adminModal.classList.add('flex');
 }
+
 
 function closeAdminModal() {
     adminModal.classList.add('hidden');
@@ -637,6 +647,106 @@ deleteButton.addEventListener('click', async () => {
         else { closeModal(); calendar.refetchEvents(); }
     }
 });
+
+// --- INIZIALIZZAZIONE ---
+checkUserSession();
+
+
+
+const sbClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// --- RIFERIMENTI AGLI ELEMENTI DEL DOM ---
+const loginSection = document.getElementById('login-section');
+const appSection = document.getElementById('app-section');
+const loginForm = document.getElementById('login-form');
+const loginError = document.getElementById('login-error');
+const userEmailSpan = document.getElementById('user-email');
+const logoutButton = document.getElementById('logout-button');
+const appNavigation = document.getElementById('app-navigation');
+
+// Viste principali
+const calendarView = document.getElementById('calendar-view');
+const adminView = document.getElementById('admin-view');
+const notesView = document.getElementById('notes-view');
+
+// Filtri
+const calendarFilterContainer = document.getElementById('calendar-filter-container');
+const calendarTeacherFilter = document.getElementById('calendar-teacher-filter');
+const notesFilterContainer = document.getElementById('notes-filter-container');
+const notesTeacherFilter = document.getElementById('notes-teacher-filter');
+const notesStudentFilter = document.getElementById('notes-student-filter');
+
+// Vista Appuntamenti & Note
+const notesTableBody = document.getElementById('notes-table-body');
+const notesTableStudentHeader = document.getElementById('notes-table-student-header');
+const notesTableTeacherHeader = document.getElementById('notes-table-teacher-header');
+
+// Modale Appuntamenti
+const modal = document.getElementById('appointment-modal');
+const modalTitle = document.getElementById('modal-title');
+const appointmentForm = document.getElementById('appointment-form');
+const appointmentIdInput = document.getElementById('appointment-id');
+const studentSelect = document.getElementById('student-select');
+const teacherSelect = document.getElementById('teacher-select');
+const classroomSelect = document.getElementById('classroom-select');
+const appointmentTime = document.getElementById('appointment-time');
+const appointmentNotes = document.getElementById('appointment-notes');
+const appointmentStudentName = document.getElementById('appointment-student-name');
+const appointmentTeacherName = document.getElementById('appointment-teacher-name');
+const cancelButton = document.getElementById('cancel-modal-button');
+const deleteButton = document.getElementById('delete-appointment-button');
+
+// Modale Admin
+const adminModal = document.getElementById('admin-modal');
+const adminModalTitle = document.getElementById('admin-modal-title');
+const adminForm = document.getElementById('admin-form');
+const adminFormError = document.getElementById('admin-form-error');
+const adminEditId = document.getElementById('admin-edit-id');
+const adminEditType = document.getElementById('admin-edit-type');
+const adminInputName = document.getElementById('admin-input-name');
+const adminInputEmailContainer = document.getElementById('admin-input-email-container');
+const adminInputEmail = document.getElementById('admin-input-email');
+const adminInputPasswordContainer = document.getElementById('admin-input-password-container');
+const adminInputPassword = document.getElementById('admin-input-password');
+const adminDefaultClassroomContainer = document.getElementById('admin-default-classroom-container');
+const adminDefaultClassroomSelect = document.getElementById('admin-default-classroom-select');
+const adminCancelButton = document.getElementById('admin-cancel-button');
+
+// Elementi Admin
+const addStudentBtn = document.getElementById('add-student-btn');
+const addTeacherBtn = document.getElementById('add-teacher-btn');
+const addClassroomBtn = document.getElementById('add-classroom-btn');
+const adminTabs = { students: document.getElementById('tab-students'), teachers: document.getElementById('tab-teachers'), classrooms: document.getElementById('tab-classrooms') };
+const adminContents = { students: document.getElementById('admin-content-students'), teachers: document.getElementById('admin-content-teachers'), classrooms: document.getElementById('admin-content-classrooms') };
+const tableBodies = { students: document.getElementById('students-table-body'), teachers: document.getElementById('teachers-table-body'), classrooms: document.getElementById('classrooms-table-body') };
+
+// --- VARIABILI GLOBALI DI STATO ---
+let calendar;
+let currentUser = null;
+let currentUserRole = null;
+let newAppointmentInfo = null;
+let allAppointmentsForNotesView = [];
+
+// --- LOGICA DI AUTENTENTICAZIONE E UI ---
+
+loginForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    loginError.textContent = '';
+    const { data, error } = await sbClient.auth.signInWithPassword({ email: event.target.email.value, password: event.target.password.value });
+    if (error) {
+        loginError.textContent = 'Credenziali non valide. Riprova.';
+    } else if (data.user) {
+        currentUser = data.user;
+        await loadUserDataAndRenderUI(data.user);
+    }
+});
+
+logoutButton.addEventListener('click', async () => {
+    await sbClient.auth.signOut();
+    currentUser = null;
+    currentUserRole = null;
+    if (calendar) calendar.destroy();
+
 
 // --- INIZIALIZZAZIONE ---
 checkUserSession();
