@@ -2,7 +2,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 // --- CONFIGURAZIONE SUPABASE ---
 const SUPABASE_URL = 'https://nxkcnjzkjboorltirjad.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54a2NuanpramJvb3JsdGlyamFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4MDkyNzAsImV4cCI6MjA3MjM4NTI3MH0.E1tK4QOlhpTPMtmYLRZtTvDy5QT_wej25cZAMkBh4CM';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54a2NuanpramJvb3JsdGlyamFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4MDkyNzAsImV4cCI6MjA3MjM4NTI3MH0.E1tK4QOlhpTPMtmYLRZtTvDy5QT_wej25cZAMkBh4CM';
 const sbClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // --- RIFERIMENTI AGLI ELEMENTI DEL DOM ---
@@ -19,11 +19,17 @@ const calendarView = document.getElementById('calendar-view');
 const adminView = document.getElementById('admin-view');
 const notesView = document.getElementById('notes-view');
 
-// Vista Appuntamenti & Note
+// Filtri
+const calendarFilterContainer = document.getElementById('calendar-filter-container');
+const calendarTeacherFilter = document.getElementById('calendar-teacher-filter');
 const notesFilterContainer = document.getElementById('notes-filter-container');
+const notesTeacherFilter = document.getElementById('notes-teacher-filter');
 const notesStudentFilter = document.getElementById('notes-student-filter');
+
+// Vista Appuntamenti & Note
 const notesTableBody = document.getElementById('notes-table-body');
-const notesTablePersonHeader = document.getElementById('notes-table-person-header');
+const notesTableStudentHeader = document.getElementById('notes-table-student-header');
+const notesTableTeacherHeader = document.getElementById('notes-table-teacher-header');
 
 // Modale Appuntamenti
 const modal = document.getElementById('appointment-modal');
@@ -31,12 +37,12 @@ const modalTitle = document.getElementById('modal-title');
 const appointmentForm = document.getElementById('appointment-form');
 const appointmentIdInput = document.getElementById('appointment-id');
 const studentSelect = document.getElementById('student-select');
-const teacherSelectContainer = document.getElementById('teacher-select-container');
 const teacherSelect = document.getElementById('teacher-select');
 const classroomSelect = document.getElementById('classroom-select');
 const appointmentTime = document.getElementById('appointment-time');
 const appointmentNotes = document.getElementById('appointment-notes');
-const saveButton = document.getElementById('save-appointment-button');
+const appointmentStudentName = document.getElementById('appointment-student-name');
+const appointmentTeacherName = document.getElementById('appointment-teacher-name');
 const cancelButton = document.getElementById('cancel-modal-button');
 const deleteButton = document.getElementById('delete-appointment-button');
 
@@ -52,47 +58,33 @@ const adminInputEmailContainer = document.getElementById('admin-input-email-cont
 const adminInputEmail = document.getElementById('admin-input-email');
 const adminInputPasswordContainer = document.getElementById('admin-input-password-container');
 const adminInputPassword = document.getElementById('admin-input-password');
+const adminDefaultClassroomContainer = document.getElementById('admin-default-classroom-container');
+const adminDefaultClassroomSelect = document.getElementById('admin-default-classroom-select');
 const adminCancelButton = document.getElementById('admin-cancel-button');
-const adminSaveButton = document.getElementById('admin-save-button');
 
 // Elementi Admin
 const addStudentBtn = document.getElementById('add-student-btn');
 const addTeacherBtn = document.getElementById('add-teacher-btn');
 const addClassroomBtn = document.getElementById('add-classroom-btn');
-const adminTabs = {
-    students: document.getElementById('tab-students'),
-    teachers: document.getElementById('tab-teachers'),
-    classrooms: document.getElementById('tab-classrooms'),
-};
-const adminContents = {
-    students: document.getElementById('admin-content-students'),
-    teachers: document.getElementById('admin-content-teachers'),
-    classrooms: document.getElementById('admin-content-classrooms'),
-};
-const tableBodies = {
-    students: document.getElementById('students-table-body'),
-    teachers: document.getElementById('teachers-table-body'),
-    classrooms: document.getElementById('classrooms-table-body'),
-};
+const adminTabs = { students: document.getElementById('tab-students'), teachers: document.getElementById('tab-teachers'), classrooms: document.getElementById('tab-classrooms') };
+const adminContents = { students: document.getElementById('admin-content-students'), teachers: document.getElementById('admin-content-teachers'), classrooms: document.getElementById('admin-content-classrooms') };
+const tableBodies = { students: document.getElementById('students-table-body'), teachers: document.getElementById('teachers-table-body'), classrooms: document.getElementById('classrooms-table-body') };
 
 // --- VARIABILI GLOBALI DI STATO ---
 let calendar;
 let currentUser = null;
 let currentUserRole = null;
 let newAppointmentInfo = null;
-let allAppointmentsForNotesView = []; // Cache per i dati della vista note
+let allAppointmentsForNotesView = [];
 
-// --- LOGICA DI AUTENTICAZIONE E UI PRINCIPALE---
+// --- LOGICA DI AUTENTENTICAZIONE E UI ---
 
 loginForm.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const email = event.target.email.value;
-    const password = event.target.password.value;
     loginError.textContent = '';
-    const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
+    const { data, error } = await sbClient.auth.signInWithPassword({ email: event.target.email.value, password: event.target.password.value });
     if (error) {
         loginError.textContent = 'Credenziali non valide. Riprova.';
-        console.error('Login error:', error.message);
     } else if (data.user) {
         currentUser = data.user;
         await loadUserDataAndRenderUI(data.user);
@@ -104,13 +96,12 @@ logoutButton.addEventListener('click', async () => {
     currentUser = null;
     currentUserRole = null;
     if (calendar) calendar.destroy();
-    showLoginScreen();
+    window.location.reload(); // Ricarica per resettare lo stato
 });
 
 function showLoginScreen() {
     appSection.classList.add('hidden');
     loginSection.classList.remove('hidden');
-    userEmailSpan.textContent = '';
 }
 
 function showAppScreen(user) {
@@ -121,25 +112,23 @@ function showAppScreen(user) {
 
 async function loadUserDataAndRenderUI(user) {
     showAppScreen(user);
-    const { data: profile, error } = await sbClient.from('profiles').select('ruolo').eq('id', user.id).single();
+    const { data: profile, error } = await sbClient.from('profiles').select('ruolo, aula_default_id').eq('id', user.id).single();
     if (error) {
         console.error("Errore nel caricare il profilo utente:", error);
-        loginError.textContent = "Impossibile caricare il profilo utente. Errore: " + error.message;
         await sbClient.auth.signOut();
         showLoginScreen();
         return;
     }
     currentUserRole = profile.ruolo;
+    currentUser.profile = profile; // Allega i dati del profilo all'utente corrente
     updateNavigation(profile.ruolo);
-    initializeCalendar(user, profile.ruolo);
+    initializeCalendar();
     showView('calendar');
-    console.log(`Utente loggato con ruolo: ${profile.ruolo}`);
 }
 
 function updateNavigation(role) {
     const existingAdminLink = document.getElementById('nav-admin');
     if (existingAdminLink) existingAdminLink.remove();
-
     if (role === 'admin') {
         const adminLink = document.createElement('a');
         adminLink.href = '#';
@@ -161,124 +150,82 @@ async function checkUserSession() {
     }
 }
 
-
 // --- GESTIONE VISTE E NAVIGAZIONE ---
 
 function showView(viewName) {
-    // Nascondi tutte le viste
-    calendarView.classList.add('hidden');
-    adminView.classList.add('hidden');
-    notesView.classList.add('hidden');
+    [calendarView, adminView, notesView].forEach(v => v.classList.add('hidden'));
     document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
 
-    // Mostra la vista richiesta e imposta il link attivo
     if (viewName === 'calendar') {
         calendarView.classList.remove('hidden');
         document.getElementById('nav-calendar').classList.add('active');
+        if(currentUserRole === 'admin') setupTeacherFilter(calendarTeacherFilter, () => calendar.refetchEvents());
     } else if (viewName === 'notes') {
         notesView.classList.remove('hidden');
         document.getElementById('nav-notes').classList.add('active');
         loadNotesViewData();
     } else if (viewName === 'admin') {
         adminView.classList.remove('hidden');
-        const adminLink = document.getElementById('nav-admin');
-        if (adminLink) adminLink.classList.add('active');
+        document.getElementById('nav-admin')?.classList.add('active');
         loadAdminData();
     }
 }
 
 function setupEventListeners() {
-    document.getElementById('nav-calendar').addEventListener('click', (e) => {
-        e.preventDefault();
-        showView('calendar');
-    });
-    
-    document.getElementById('nav-notes').addEventListener('click', (e) => {
-        e.preventDefault();
-        showView('notes');
-    });
-
-    const adminLink = document.getElementById('nav-admin');
-    if (adminLink) {
-        adminLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            showView('admin');
-        });
-    }
-
-    Object.keys(adminTabs).forEach(key => {
-        adminTabs[key].addEventListener('click', () => showAdminTab(key));
-    });
-
-    Object.values(tableBodies).forEach(tbody => {
-        tbody.addEventListener('click', handleAdminTableClick);
-    });
-    
-    addStudentBtn.addEventListener('click', () => openAdminModal('students'));
-    addTeacherBtn.addEventListener('click', () => openAdminModal('teachers'));
-    addClassroomBtn.addEventListener('click', () => openAdminModal('classrooms'));
+    document.getElementById('nav-calendar').addEventListener('click', (e) => { e.preventDefault(); showView('calendar'); });
+    document.getElementById('nav-notes').addEventListener('click', (e) => { e.preventDefault(); showView('notes'); });
+    document.getElementById('nav-admin')?.addEventListener('click', (e) => { e.preventDefault(); showView('admin'); });
+    Object.keys(adminTabs).forEach(key => adminTabs[key].addEventListener('click', () => showAdminTab(key)));
+    Object.values(tableBodies).forEach(tbody => tbody.addEventListener('click', handleAdminTableClick));
+    [addStudentBtn, addTeacherBtn, addClassroomBtn].forEach(btn => btn.addEventListener('click', () => openAdminModal(btn.id.split('-')[1] + 's')));
     adminForm.addEventListener('submit', handleAdminFormSubmit);
     adminCancelButton.addEventListener('click', closeAdminModal);
-    
-    notesStudentFilter.addEventListener('change', () => {
-        const selectedStudentId = notesStudentFilter.value;
-        const filteredAppointments = (selectedStudentId === 'all')
-            ? allAppointmentsForNotesView
-            : allAppointmentsForNotesView.filter(apt => apt.studente_id.id === selectedStudentId);
-        renderAppointmentsTable(filteredAppointments);
-    });
+    notesStudentFilter.addEventListener('change', () => renderAppointmentsTable(filterAppointments()));
+    notesTeacherFilter.addEventListener('change', () => loadNotesViewData());
 }
 
 // --- LOGICA VISTA APPUNTAMENTI & NOTE ---
 
 async function loadNotesViewData() {
-    const isTeacherOrAdmin = currentUserRole === 'teacher' || currentUserRole === 'admin';
-    notesFilterContainer.style.display = isTeacherOrAdmin ? 'block': 'none';
+    const isTeacher = currentUserRole === 'teacher';
+    const isAdmin = currentUserRole === 'admin';
+    
+    notesFilterContainer.style.display = (isTeacher || isAdmin) ? 'flex' : 'none';
+    notesTeacherFilter.style.display = isAdmin ? 'inline-block' : 'none';
+    document.querySelector('label[for="notes-teacher-filter"]').style.display = isAdmin ? 'inline-block' : 'none';
+    
+    notesTableStudentHeader.style.display = (isAdmin || isTeacher) ? '' : 'none';
+    notesTableTeacherHeader.style.display = (isAdmin || currentUserRole === 'student') ? '' : 'none';
 
-    // Adatta l'intestazione della tabella in base al ruolo
-    if (currentUserRole === 'student') {
-        notesTablePersonHeader.textContent = 'Insegnante';
-    } else {
-        notesTablePersonHeader.textContent = 'Studente';
+    if (isAdmin) {
+        await setupTeacherFilter(notesTeacherFilter);
     }
 
-    let query;
-    const selectString = '*, studente_id(id, nome), insegnante_id(id, nome), aula_id(id, nome)';
-
-    if (currentUserRole === 'admin') {
-        query = sbClient.from('appuntamenti').select(selectString);
-    } else if (currentUserRole === 'teacher') {
-        query = sbClient.from('appuntamenti').select(selectString).eq('insegnante_id', currentUser.id);
+    let query = sbClient.from('appuntamenti').select('*, studente_id(id, nome), insegnante_id(id, nome), aula_id(id, nome)');
+    
+    if (isAdmin) {
+        const selectedTeacherId = notesTeacherFilter.value;
+        if (selectedTeacherId !== 'all') query = query.eq('insegnante_id', selectedTeacherId);
+    } else if (isTeacher) {
+        query = query.eq('insegnante_id', currentUser.id);
     } else { // student
-        query = sbClient.from('appuntamenti').select(selectString).eq('studente_id', currentUser.id);
+        query = query.eq('studente_id', currentUser.id);
     }
 
     const { data, error } = await query.order('data_inizio', { ascending: false });
-
     if (error) {
-        console.error("Errore nel caricare i dati per la vista note:", error);
-        notesTableBody.innerHTML = `<tr><td colspan="5" class="px-6 py-4 text-center text-red-500">Errore nel caricamento dei dati.</td></tr>`;
+        console.error("Errore caricamento note:", error);
         return;
     }
-
     allAppointmentsForNotesView = data;
-
-    if (isTeacherOrAdmin) {
-        populateStudentFilter(data);
-    }
-    
+    populateStudentFilter(data);
     renderAppointmentsTable(data);
 }
 
 function populateStudentFilter(appointments) {
-    const students = new Map();
-    appointments.forEach(apt => {
-        if (apt.studente_id) {
-            students.set(apt.studente_id.id, apt.studente_id.nome);
-        }
-    });
-
-    notesStudentFilter.innerHTML = '<option value="all">Tutti gli Studenti</option>';
+    const students = new Map([['all', 'Tutti gli Studenti']]);
+    appointments.forEach(apt => apt.studente_id && students.set(apt.studente_id.id, apt.studente_id.nome));
+    notesStudentFilter.innerHTML = '';
     students.forEach((name, id) => {
         const option = document.createElement('option');
         option.value = id;
@@ -287,78 +234,70 @@ function populateStudentFilter(appointments) {
     });
 }
 
+function filterAppointments() {
+    const selectedStudentId = notesStudentFilter.value;
+    return (selectedStudentId === 'all')
+        ? allAppointmentsForNotesView
+        : allAppointmentsForNotesView.filter(apt => apt.studente_id?.id === selectedStudentId);
+}
+
 function renderAppointmentsTable(appointments) {
     notesTableBody.innerHTML = '';
-    if (appointments.length === 0) {
-        notesTableBody.innerHTML = `<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">Nessun appuntamento trovato.</td></tr>`;
+    if (!appointments || appointments.length === 0) {
+        notesTableBody.innerHTML = `<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">Nessun appuntamento trovato.</td></tr>`;
         return;
     }
-
     appointments.forEach(apt => {
         const row = document.createElement('tr');
         const startDate = new Date(apt.data_inizio);
-
-        const personName = (currentUserRole === 'student')
-            ? apt.insegnante_id?.nome || 'N/D'
-            : apt.studente_id?.nome || 'N/D';
-
         row.innerHTML = `
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${startDate.toLocaleDateString('it-IT')}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${startDate.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${personName}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${apt.aula_id?.nome || 'N/D'}</td>
-            <td class="px-6 py-4 text-sm text-gray-800">${apt.note || ''}</td>
+            <td class="px-6 py-4">${startDate.toLocaleDateString('it-IT')}</td>
+            <td class="px-6 py-4">${startDate.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</td>
+            ${(currentUserRole !== 'student') ? `<td class="px-6 py-4">${apt.studente_id?.nome || 'N/D'}</td>` : ''}
+            ${(currentUserRole !== 'teacher') ? `<td class="px-6 py-4">${apt.insegnante_id?.nome || 'N/D'}</td>` : ''}
+            <td class="px-6 py-4">${apt.aula_id?.nome || 'N/D'}</td>
+            <td class="px-6 py-4 text-sm">${apt.note || ''}</td>
         `;
         notesTableBody.appendChild(row);
     });
 }
 
-
 // --- LOGICA PANNELLO DI AMMINISTRAZIONE ---
 
 function showAdminTab(tabName) {
-    Object.values(adminTabs).forEach(tab => {
-        tab.classList.remove('text-indigo-600', 'border-indigo-500');
-        tab.classList.add('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300', 'border-transparent');
-    });
+    Object.values(adminTabs).forEach(tab => tab.classList.remove('text-indigo-600', 'border-indigo-500'));
     adminTabs[tabName].classList.add('text-indigo-600', 'border-indigo-500');
-    adminTabs[tabName].classList.remove('text-gray-500');
-
     Object.values(adminContents).forEach(content => content.classList.add('hidden'));
     adminContents[tabName].classList.remove('hidden');
 }
 
 async function loadAdminData() {
-    const { data: students, error: sError } = await sbClient.from('profiles').select('id, nome, email').eq('ruolo', 'student');
-    if(sError) console.error("Errore caricamento studenti:", sError); else renderTable('students', students, ['nome', 'email']);
-
-    const { data: teachers, error: tError } = await sbClient.from('profiles').select('id, nome, email').eq('ruolo', 'teacher');
-    if(tError) console.error("Errore caricamento insegnanti:", tError); else renderTable('teachers', teachers, ['nome', 'email']);
-
-    const { data: classrooms, error: cError } = await sbClient.from('aule').select('id, nome');
-    if(cError) console.error("Errore caricamento aule:", cError); else renderTable('classrooms', classrooms, ['nome']);
+    const { data: students } = await sbClient.from('profiles').select('id, nome, email').eq('ruolo', 'student');
+    renderTable('students', students, ['nome', 'email']);
+    const { data: teachers } = await sbClient.from('profiles').select('*, aula_default_id(id, nome)').eq('ruolo', 'teacher');
+    renderTable('teachers', teachers, ['nome', 'email', 'aula_default_id.nome']);
+    const { data: classrooms } = await sbClient.from('aule').select('id, nome');
+    renderTable('classrooms', classrooms, ['nome']);
 }
 
 function renderTable(type, data, columns) {
     const tbody = tableBodies[type];
     tbody.innerHTML = '';
-    if (data.length === 0) {
-        const colspan = columns.length + 1;
-        tbody.innerHTML = `<tr><td colspan="${colspan}" class="px-6 py-4 text-center text-gray-500">Nessun dato disponibile.</td></tr>`;
-        return;
-    }
     data.forEach(item => {
         const row = document.createElement('tr');
         columns.forEach(col => {
             const cell = document.createElement('td');
-            cell.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-800';
-            cell.textContent = item[col] || '-';
+            cell.className = 'px-6 py-4 text-sm';
+            const keys = col.split('.');
+            let value = item;
+            for(const key of keys) { value = value ? value[key] : null; }
+            cell.textContent = value || '-';
             row.appendChild(cell);
         });
         const actionsCell = document.createElement('td');
-        actionsCell.className = 'px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2';
+        actionsCell.className = 'px-6 py-4 space-x-2';
         actionsCell.innerHTML = `
-            <button class="text-indigo-600 hover:text-indigo-900 admin-edit-btn" data-id="${item.id}" data-type="${type}" data-name="${item.nome || ''}" data-email="${item.email || ''}">Modifica</button>
+            <button class="text-indigo-600 hover:text-indigo-900 admin-edit-btn" data-id="${item.id}" data-type="${type}">Modifica</button>
             <button class="text-red-600 hover:text-red-900 admin-delete-btn" data-id="${item.id}" data-type="${type}" data-name="${item.nome || item.email}">Elimina</button>
         `;
         row.appendChild(actionsCell);
@@ -366,69 +305,58 @@ function renderTable(type, data, columns) {
     });
 }
 
-function handleAdminTableClick(event) {
+async function handleAdminTableClick(event) {
     const target = event.target;
+    const { id, type, name } = target.dataset;
     if (target.classList.contains('admin-edit-btn')) {
-        const { id, type, name, email } = target.dataset;
-        openAdminModal(type, { id, nome: name, email });
+        const { data } = await sbClient.from(type === 'classrooms' ? 'aule' : 'profiles').select('*').eq('id', id).single();
+        openAdminModal(type, data);
     }
     if (target.classList.contains('admin-delete-btn')) {
-        const { id, type, name } = target.dataset;
         handleAdminDelete(id, type, name);
     }
 }
 
 async function handleAdminDelete(id, type, name) {
-    const confirmMessage = `Sei sicuro di voler eliminare "${name}"? Questa azione è irreversibile.`;
-    if (!window.confirm(confirmMessage)) return;
-
-    let error;
-    if (type === 'students' || type === 'teachers') {
-        const { error: deleteError } = await sbClient.from('profiles').delete().eq('id', id);
-        error = deleteError;
-    } else if (type === 'classrooms') {
-        const { error: deleteError } = await sbClient.from('aule').delete().eq('id', id);
-        error = deleteError;
-    }
-
-    if (error) {
-        alert(`Errore durante l'eliminazione: ${error.message}`);
-    } else {
-        loadAdminData();
-    }
+    if (!window.confirm(`Sei sicuro di voler eliminare "${name}"?`)) return;
+    const fromTable = type === 'classrooms' ? 'aule' : 'profiles';
+    const { error } = await sbClient.from(fromTable).delete().eq('id', id);
+    if (error) alert(`Errore: ${error.message}`);
+    else loadAdminData();
 }
 
-function openAdminModal(type, item = null) {
+async function openAdminModal(type, item = null) {
     adminForm.reset();
     adminFormError.textContent = '';
-    adminEditId.value = item ? item.id : '';
+    adminEditId.value = item?.id || '';
     adminEditType.value = type;
+    adminModalTitle.textContent = `${item ? 'Modifica' : 'Nuovo'} ${type.slice(0, -1)}`;
 
-    if (type === 'students' || type === 'teachers') {
-        adminInputEmailContainer.classList.remove('hidden');
-        if (item) { // Edit mode
-            adminModalTitle.textContent = `Modifica ${type === 'students' ? 'Studente' : 'Insegnante'}`;
-            adminInputName.value = item.nome;
-            adminInputEmail.value = item.email;
-            adminInputEmail.readOnly = true;
-            adminInputEmail.classList.add('bg-gray-100');
-            adminInputPasswordContainer.classList.add('hidden');
-            adminInputPassword.required = false;
-        } else { // Create mode
-            adminModalTitle.textContent = `Nuovo ${type === 'students' ? 'Studente' : 'Insegnante'}`;
-            adminInputEmail.readOnly = false;
-            adminInputEmail.classList.remove('bg-gray-100');
-            adminInputPasswordContainer.classList.remove('hidden');
-            adminInputPassword.required = true;
-        }
-    } else if (type === 'classrooms') {
-        adminModalTitle.textContent = item ? 'Modifica Aula' : 'Nuova Aula';
-        adminInputName.value = item ? item.nome : '';
-        adminInputEmailContainer.classList.add('hidden');
-        adminInputPasswordContainer.classList.add('hidden');
-        adminInputPassword.required = false;
+    const isProfile = type === 'students' || type === 'teachers';
+    adminInputEmailContainer.style.display = isProfile ? '' : 'none';
+    adminInputPasswordContainer.style.display = isProfile && !item ? '' : 'none';
+    adminDefaultClassroomContainer.style.display = type === 'teachers' && item ? '' : 'none';
+    
+    if(item) {
+        adminInputName.value = item.nome;
+        if(isProfile) adminInputEmail.value = item.email;
+        adminInputEmail.readOnly = true;
+    } else {
+         adminInputEmail.readOnly = false;
     }
     
+    if(type === 'teachers' && item) {
+        const { data: aule } = await sbClient.from('aule').select('id, nome');
+        adminDefaultClassroomSelect.innerHTML = '<option value="">Nessuna</option>';
+        aule.forEach(a => {
+            const option = document.createElement('option');
+            option.value = a.id;
+            option.textContent = a.nome;
+            if(item.aula_default_id === a.id) option.selected = true;
+            adminDefaultClassroomSelect.appendChild(option);
+        });
+    }
+
     adminModal.classList.remove('hidden');
     adminModal.classList.add('flex');
 }
@@ -446,94 +374,99 @@ async function handleAdminFormSubmit(event) {
     const name = adminInputName.value;
     let error;
 
-    if (id) { // --- EDIT MODE ---
-        if (type === 'students' || type === 'teachers') {
-            ({ error } = await sbClient.from('profiles').update({ nome: name }).eq('id', id));
-        } else if (type === 'classrooms') {
-            ({ error } = await sbClient.from('aule').update({ nome: name }).eq('id', id));
+    if (id) { // Edit
+        const fromTable = type === 'classrooms' ? 'aule' : 'profiles';
+        const updateData = { nome: name };
+        if (type === 'teachers') {
+            updateData.aula_default_id = adminDefaultClassroomSelect.value || null;
         }
-    } else { // --- CREATE MODE ---
-        if (type === 'students' || type === 'teachers') {
+        ({ error } = await sbClient.from(fromTable).update(updateData).eq('id', id));
+    } else { // Create
+        if (type === 'classrooms') {
+            ({ error } = await sbClient.from('aule').insert({ nome: name }));
+        } else {
             const email = adminInputEmail.value.trim();
             const password = adminInputPassword.value;
-
             if (password.length < 6) {
                 adminFormError.textContent = "La password deve essere di almeno 6 caratteri.";
                 return;
             }
-            
-            const { data: { session: adminSession }, error: sessionError } = await sbClient.auth.getSession();
-             if (sessionError || !adminSession) {
-                adminFormError.textContent = 'Errore di sessione, impossibile creare utente. Riprovare il login.';
-                return;
-            }
-
+            const { data: { session: adminSession } } = await sbClient.auth.getSession();
             const { data: { user: newUser }, error: signUpError } = await sbClient.auth.signUp({ email, password });
+            await sbClient.auth.setSession(adminSession);
 
             if (signUpError) {
-                adminFormError.textContent = `Errore: ${signUpError.message}. Prova una password più robusta (con maiuscole, numeri o simboli).`;
-                return;
-            } 
-            
-            if (newUser) {
+                error = signUpError;
+            } else if (newUser) {
                 const newRole = type === 'students' ? 'student' : 'teacher';
-                const { error: updateError } = await sbClient.from('profiles')
-                    .update({ nome: name, ruolo: newRole })
-                    .eq('id', newUser.id);
-
-                if (updateError) {
-                    error = { message: `Utente creato, ma errore nell'aggiornare il profilo: ${updateError.message}` };
-                } else {
-                    const { error: restoreError } = await sbClient.auth.setSession(adminSession);
-                    if(restoreError) {
-                        alert('Nuovo utente creato, ma si è verificato un errore nel ripristino della sessione. Si prega di effettuare nuovamente il login.');
-                        await sbClient.auth.signOut();
-                        showLoginScreen();
-                    }
-                }
+                const { error: updateError } = await sbClient.from('profiles').update({ nome: name, ruolo: newRole }).eq('id', newUser.id);
+                if (updateError) error = { message: `Utente creato, ma errore nell'aggiornare il profilo: ${updateError.message}` };
             }
-        } else if (type === 'classrooms') {
-            ({ error } = await sbClient.from('aule').insert({ nome: name }));
         }
     }
 
-    if (error) {
-        adminFormError.textContent = `Errore nel salvataggio: ${error.message}`;
-    } else {
-        closeAdminModal();
-        loadAdminData();
-    }
+    if (error) adminFormError.textContent = `Errore: ${error.message}`;
+    else { closeAdminModal(); loadAdminData(); }
 }
-
 
 // --- LOGICA DEL CALENDARIO ---
 
-async function fetchEvents(user, role) {
-    let allEvents = [];
-    const selectString = '*, studente_id(id, nome), insegnante_id(id, nome), aula_id(id, nome)';
+async function setupTeacherFilter(selectElement, onChangeCallback) {
+    calendarFilterContainer.style.display = 'block';
+    const { data: teachers } = await sbClient.from('profiles').select('id, nome').eq('ruolo', 'teacher');
+    selectElement.innerHTML = '<option value="all">Tutti gli Insegnanti</option>';
+    teachers.forEach(t => {
+        const option = document.createElement('option');
+        option.value = t.id;
+        option.textContent = t.nome;
+        selectElement.appendChild(option);
+    });
+    if (onChangeCallback) selectElement.onchange = onChangeCallback;
+}
 
-    let query = (role === 'admin') ? sbClient.from('appuntamenti').select(selectString)
-              : (role === 'student') ? sbClient.from('appuntamenti').select(selectString).eq('studente_id', user.id)
-              : sbClient.from('appuntamenti').select(selectString).eq('insegnante_id', user.id);
+function getEventColor(classroomName) {
+    if (!classroomName) return '#4f46e5'; // Default color
+    const name = classroomName.toLowerCase();
+    const colors = {
+        'rossa': '#ef4444', 'rosso': '#ef4444',
+        'gialla': '#f59e0b', 'giallo': '#f59e0b',
+        'verde': '#10b981',
+        'blu': '#3b82f6',
+        'azzurra': '#60a5fa', 'azzurro': '#60a5fa',
+        'viola': '#8b5cf6',
+        'arancione': '#f97316'
+    };
+    return colors[name] || '#6b7280'; // Grigio per altri nomi
+}
+
+async function fetchEvents() {
+    let query = sbClient.from('appuntamenti').select('*, studente_id(id, nome), insegnante_id(id, nome), aula_id(id, nome)');
+    
+    if (currentUserRole === 'admin') {
+        const selectedTeacherId = calendarTeacherFilter.value;
+        if (selectedTeacherId !== 'all') query = query.eq('insegnante_id', selectedTeacherId);
+    } else if (currentUserRole === 'teacher') {
+        query = query.eq('insegnante_id', currentUser.id);
+    } else { // student
+        query = query.eq('studente_id', currentUser.id);
+    }
     
     const { data, error } = await query;
-    if (error) { console.error("Errore nel caricare gli appuntamenti:", error); return []; }
-
-    allEvents.push(...data.map(apt => ({
+    if (error) { console.error("Errore fetchEvents:", error); return []; }
+    
+    let allEvents = data.map(apt => ({
         id: apt.id,
         title: `${apt.studente_id?.nome || '?'} con ${apt.insegnante_id?.nome || '?'}`,
         start: apt.data_inizio, end: apt.data_fine,
-        extendedProps: {
-            notes: apt.note,
-            studentId: apt.studente_id?.id, teacherId: apt.insegnante_id?.id, classroomId: apt.aula_id?.id
-        }
-    })));
+        backgroundColor: getEventColor(apt.aula_id?.nome),
+        borderColor: getEventColor(apt.aula_id?.nome),
+        extendedProps: { ...apt }
+    }));
 
-    if (role === 'teacher') {
-        const { data: occupied, error: rpcError } = await sbClient.rpc('get_occupied_slots');
-        if (rpcError) { console.error("Errore slot occupati:", rpcError); }
-        else {
-            allEvents.push(...occupied.filter(s => s.insegnante_id !== user.id).map(s => ({
+    if (currentUserRole === 'teacher') {
+        const { data: occupied } = await sbClient.rpc('get_occupied_slots');
+        if (occupied) {
+            allEvents.push(...occupied.filter(s => s.insegnante_id !== currentUser.id).map(s => ({
                 title: 'Occupato', start: s.data_inizio, end: s.data_fine, display: 'background', color: '#e5e7eb'
             })));
         }
@@ -541,17 +474,17 @@ async function fetchEvents(user, role) {
     return allEvents;
 }
 
-function initializeCalendar(user, role) {
+function initializeCalendar() {
     const calendarEl = document.getElementById('calendar');
     if (calendar) calendar.destroy();
-    const isEditable = role === 'admin' || role === 'teacher';
+    const isEditable = currentUserRole === 'admin' || currentUserRole === 'teacher';
 
     calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'timeGridWeek',
         headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' },
         locale: 'it', slotMinTime: '08:00:00', slotMaxTime: '21:00:00', allDaySlot: false,
         selectable: isEditable, editable: isEditable,
-        events: (info, success, fail) => fetchEvents(user, role).then(success).catch(fail),
+        events: (info, success, fail) => fetchEvents().then(success).catch(fail),
         select: (info) => { if (isEditable) { newAppointmentInfo = info; openModalForNew(); } },
         eventClick: (info) => { if (info.event.display !== 'background') openModalForEdit(info.event); }
     });
@@ -565,13 +498,23 @@ async function openModalForNew() {
     modalTitle.textContent = 'Nuovo Appuntamento';
     appointmentIdInput.value = '';
     deleteButton.style.display = 'none';
-    teacherSelectContainer.style.display = (currentUserRole === 'admin') ? '' : 'none';
-    teacherSelect.required = (currentUserRole === 'admin');
 
-    const { start, end } = newAppointmentInfo;
-    appointmentTime.textContent = `${start.toLocaleDateString('it-IT')} dalle ${start.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})} alle ${end.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})}`;
+    [studentSelect, teacherSelect].forEach(el => { el.style.display = 'block'; });
+    [appointmentStudentName, appointmentTeacherName].forEach(el => { el.style.display = 'none'; });
     
-    await populateSelects();
+    const { start, end } = newAppointmentInfo;
+    appointmentTime.textContent = `${start.toLocaleDateString('it-IT')} ${start.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})} - ${end.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})}`;
+    
+    await populateAppointmentSelects();
+    
+    if (currentUserRole === 'teacher') {
+        teacherSelect.value = currentUser.id;
+        teacherSelect.disabled = true;
+        classroomSelect.value = currentUser.profile.aula_default_id || '';
+    } else {
+        teacherSelect.disabled = false;
+    }
+
     modal.classList.remove('hidden');
     modal.classList.add('flex');
 }
@@ -579,43 +522,50 @@ async function openModalForNew() {
 async function openModalForEdit(event) {
     appointmentForm.reset();
     modalTitle.textContent = 'Dettagli Appuntamento';
-    teacherSelectContainer.style.display = (currentUserRole === 'admin') ? '' : 'none';
-    teacherSelect.required = (currentUserRole === 'admin');
     
-    const canDelete = currentUserRole === 'admin' || (currentUserRole === 'teacher' && event.extendedProps.teacherId === currentUser.id);
-    deleteButton.style.display = canDelete ? '' : 'none';
-
     const { start, end, extendedProps, id } = event;
-    appointmentIdInput.value = id;
-    appointmentTime.textContent = `${start.toLocaleDateString('it-IT')} dalle ${start.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})} alle ${end.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})}`;
-    appointmentNotes.value = extendedProps.notes || '';
+    const canEdit = currentUserRole === 'admin' || (currentUserRole === 'teacher' && extendedProps.insegnante_id?.id === currentUser.id);
     
-    await populateSelects(extendedProps.studentId, extendedProps.classroomId, extendedProps.teacherId);
+    deleteButton.style.display = canEdit ? '' : 'none';
+    
+    appointmentIdInput.value = id;
+    appointmentTime.textContent = `${start.toLocaleDateString('it-IT')} ${start.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})} - ${end.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})}`;
+    appointmentNotes.value = extendedProps.note || '';
+
+    if (canEdit) {
+        [studentSelect, teacherSelect].forEach(el => { el.style.display = 'block'; });
+        [appointmentStudentName, appointmentTeacherName].forEach(el => { el.style.display = 'none'; });
+        await populateAppointmentSelects(extendedProps.studente_id?.id, extendedProps.aula_id?.id, extendedProps.insegnante_id?.id);
+        teacherSelect.disabled = currentUserRole === 'teacher';
+    } else { // Vista solo lettura per studenti
+        [studentSelect, teacherSelect, classroomSelect].forEach(el => { el.style.display = 'none'; });
+        [appointmentStudentName, appointmentTeacherName].forEach(el => { el.style.display = 'block'; });
+        appointmentStudentName.textContent = extendedProps.studente_id?.nome || 'N/D';
+        appointmentTeacherName.textContent = extendedProps.insegnante_id?.nome || 'N/D';
+        appointmentNotes.readOnly = true;
+    }
+
     modal.classList.remove('hidden');
     modal.classList.add('flex');
 }
 
-async function populateSelects(selectedStudentId = null, selectedClassroomId = null, selectedTeacherId = null) {
-    const populate = async (element, query, nameCol) => {
-        const { data, error } = await query;
-        if (error) { console.error(`Errore caricamento ${nameCol}:`, error); return; }
-        element.innerHTML = `<option value="">Seleziona...</option>`;
-        data.forEach(item => {
-            const option = document.createElement('option');
-            option.value = item.id;
-            option.textContent = item[nameCol];
-            element.appendChild(option);
-        });
+async function populateAppointmentSelects(studentId, classroomId, teacherId) {
+    const populate = async (element, query, nameCol, selectedId) => {
+        const { data } = await query;
+        if(data) {
+            element.innerHTML = `<option value="">Seleziona...</option>`;
+            data.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.id;
+                option.textContent = item[nameCol];
+                if (item.id === selectedId) option.selected = true;
+                element.appendChild(option);
+            });
+        }
     };
-    await populate(studentSelect, sbClient.from('profiles').select('id, nome').eq('ruolo', 'student'), 'nome');
-    if (currentUserRole === 'admin') {
-        await populate(teacherSelect, sbClient.from('profiles').select('id, nome').eq('ruolo', 'teacher'), 'nome');
-    }
-    await populate(classroomSelect, sbClient.from('aule').select('id, nome'), 'nome');
-
-    studentSelect.value = selectedStudentId || '';
-    classroomSelect.value = selectedClassroomId || '';
-    if (currentUserRole === 'admin') teacherSelect.value = selectedTeacherId || '';
+    await populate(studentSelect, sbClient.from('profiles').select('id, nome').eq('ruolo', 'student'), 'nome', studentId);
+    await populate(teacherSelect, sbClient.from('profiles').select('id, nome').eq('ruolo', 'teacher'), 'nome', teacherId);
+    await populate(classroomSelect, sbClient.from('aule').select('id, nome'), 'nome', classroomId);
 }
 
 function closeModal() {
@@ -633,7 +583,7 @@ appointmentForm.addEventListener('submit', async (event) => {
         studente_id: studentSelect.value,
         aula_id: classroomSelect.value,
         note: appointmentNotes.value,
-        insegnante_id: currentUserRole === 'admin' ? teacherSelect.value : currentUser.id,
+        insegnante_id: currentUserRole === 'teacher' ? currentUser.id : teacherSelect.value,
     };
 
     let error;
@@ -645,32 +595,19 @@ appointmentForm.addEventListener('submit', async (event) => {
         ({ error } = await sbClient.from('appuntamenti').insert(appointmentData));
     }
 
-    if (error) {
-        alert("Errore nel salvare l'appuntamento: " + error.message);
-        console.error(error);
-    } else {
-        closeModal();
-        calendar.refetchEvents();
-    }
+    if (error) alert("Errore: " + error.message);
+    else { closeModal(); calendar.refetchEvents(); }
 });
 
 deleteButton.addEventListener('click', async () => {
     const id = appointmentIdInput.value;
-    if(!id) return;
-    
-    if (window.confirm("Sei sicuro di voler eliminare questo appuntamento?")) {
+    if (id && window.confirm("Sei sicuro di voler eliminare questo appuntamento?")) {
         const { error } = await sbClient.from('appuntamenti').delete().eq('id', id);
-        if(error) {
-            alert("Errore durante l'eliminazione: " + error.message);
-            console.error(error);
-        } else {
-            closeModal();
-            calendar.refetchEvents();
-        }
+        if (error) alert("Errore: " + error.message);
+        else { closeModal(); calendar.refetchEvents(); }
     }
 });
 
-
-// --- INIZIALIZZAZIONE DELL'APP ---
+// --- INIZIALIZZAZIONE ---
 checkUserSession();
 
