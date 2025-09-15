@@ -2,7 +2,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 // --- CONFIGURAZIONE SUPABASE ---
 const SUPABASE_URL = 'https://nxkcnjzkjboorltirjad.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54a2NuanpramJvb3JsdGlyamFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4MDkyNzAsImV4cCI6MjA3MjM4NTI3MH0.E1tK4QOlhpTPMtmYLRZtTvDy5QT_wej25cZAMkBh4CM';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzIıNiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54a2NuanpramJvb3JsdGlyamFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4MDkyNzAsImV4cCI6MjA3MjM4NTI3MH0.E1tK4QOlhpTPMtmYLRZtTvDy5QT_wej25cZAMkBh4CM';
 const sbClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // --- RIFERIMENTI AGLI ELEMENTI DEL DOM ---
@@ -17,6 +17,13 @@ const appNavigation = document.getElementById('app-navigation');
 // Viste principali
 const calendarView = document.getElementById('calendar-view');
 const adminView = document.getElementById('admin-view');
+const notesView = document.getElementById('notes-view');
+
+// Vista Appuntamenti & Note
+const notesFilterContainer = document.getElementById('notes-filter-container');
+const notesStudentFilter = document.getElementById('notes-student-filter');
+const notesTableBody = document.getElementById('notes-table-body');
+const notesTablePersonHeader = document.getElementById('notes-table-person-header');
 
 // Modale Appuntamenti
 const modal = document.getElementById('appointment-modal');
@@ -37,6 +44,7 @@ const deleteButton = document.getElementById('delete-appointment-button');
 const adminModal = document.getElementById('admin-modal');
 const adminModalTitle = document.getElementById('admin-modal-title');
 const adminForm = document.getElementById('admin-form');
+const adminFormError = document.getElementById('admin-form-error');
 const adminEditId = document.getElementById('admin-edit-id');
 const adminEditType = document.getElementById('admin-edit-type');
 const adminInputName = document.getElementById('admin-input-name');
@@ -72,6 +80,7 @@ let calendar;
 let currentUser = null;
 let currentUserRole = null;
 let newAppointmentInfo = null;
+let allAppointmentsForNotesView = []; // Cache per i dati della vista note
 
 // --- LOGICA DI AUTENTICAZIONE E UI PRINCIPALE---
 
@@ -156,13 +165,20 @@ async function checkUserSession() {
 // --- GESTIONE VISTE E NAVIGAZIONE ---
 
 function showView(viewName) {
+    // Nascondi tutte le viste
     calendarView.classList.add('hidden');
     adminView.classList.add('hidden');
+    notesView.classList.add('hidden');
     document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
 
+    // Mostra la vista richiesta e imposta il link attivo
     if (viewName === 'calendar') {
         calendarView.classList.remove('hidden');
         document.getElementById('nav-calendar').classList.add('active');
+    } else if (viewName === 'notes') {
+        notesView.classList.remove('hidden');
+        document.getElementById('nav-notes').classList.add('active');
+        loadNotesViewData();
     } else if (viewName === 'admin') {
         adminView.classList.remove('hidden');
         const adminLink = document.getElementById('nav-admin');
@@ -175,6 +191,11 @@ function setupEventListeners() {
     document.getElementById('nav-calendar').addEventListener('click', (e) => {
         e.preventDefault();
         showView('calendar');
+    });
+    
+    document.getElementById('nav-notes').addEventListener('click', (e) => {
+        e.preventDefault();
+        showView('notes');
     });
 
     const adminLink = document.getElementById('nav-admin');
@@ -198,7 +219,100 @@ function setupEventListeners() {
     addClassroomBtn.addEventListener('click', () => openAdminModal('classrooms'));
     adminForm.addEventListener('submit', handleAdminFormSubmit);
     adminCancelButton.addEventListener('click', closeAdminModal);
+    
+    notesStudentFilter.addEventListener('change', () => {
+        const selectedStudentId = notesStudentFilter.value;
+        const filteredAppointments = (selectedStudentId === 'all')
+            ? allAppointmentsForNotesView
+            : allAppointmentsForNotesView.filter(apt => apt.studente_id.id === selectedStudentId);
+        renderAppointmentsTable(filteredAppointments);
+    });
 }
+
+// --- LOGICA VISTA APPUNTAMENTI & NOTE ---
+
+async function loadNotesViewData() {
+    const isTeacherOrAdmin = currentUserRole === 'teacher' || currentUserRole === 'admin';
+    notesFilterContainer.style.display = isTeacherOrAdmin ? 'block': 'none';
+
+    // Adatta l'intestazione della tabella in base al ruolo
+    if (currentUserRole === 'student') {
+        notesTablePersonHeader.textContent = 'Insegnante';
+    } else {
+        notesTablePersonHeader.textContent = 'Studente';
+    }
+
+    let query;
+    const selectString = '*, studente_id(id, nome), insegnante_id(id, nome), aula_id(id, nome)';
+
+    if (currentUserRole === 'admin') {
+        query = sbClient.from('appuntamenti').select(selectString);
+    } else if (currentUserRole === 'teacher') {
+        query = sbClient.from('appuntamenti').select(selectString).eq('insegnante_id', currentUser.id);
+    } else { // student
+        query = sbClient.from('appuntamenti').select(selectString).eq('studente_id', currentUser.id);
+    }
+
+    const { data, error } = await query.order('data_inizio', { ascending: false });
+
+    if (error) {
+        console.error("Errore nel caricare i dati per la vista note:", error);
+        notesTableBody.innerHTML = `<tr><td colspan="5" class="px-6 py-4 text-center text-red-500">Errore nel caricamento dei dati.</td></tr>`;
+        return;
+    }
+
+    allAppointmentsForNotesView = data;
+
+    if (isTeacherOrAdmin) {
+        populateStudentFilter(data);
+    }
+    
+    renderAppointmentsTable(data);
+}
+
+function populateStudentFilter(appointments) {
+    const students = new Map();
+    appointments.forEach(apt => {
+        if (apt.studente_id) {
+            students.set(apt.studente_id.id, apt.studente_id.nome);
+        }
+    });
+
+    notesStudentFilter.innerHTML = '<option value="all">Tutti gli Studenti</option>';
+    students.forEach((name, id) => {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = name;
+        notesStudentFilter.appendChild(option);
+    });
+}
+
+function renderAppointmentsTable(appointments) {
+    notesTableBody.innerHTML = '';
+    if (appointments.length === 0) {
+        notesTableBody.innerHTML = `<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">Nessun appuntamento trovato.</td></tr>`;
+        return;
+    }
+
+    appointments.forEach(apt => {
+        const row = document.createElement('tr');
+        const startDate = new Date(apt.data_inizio);
+
+        const personName = (currentUserRole === 'student')
+            ? apt.insegnante_id?.nome || 'N/D'
+            : apt.studente_id?.nome || 'N/D';
+
+        row.innerHTML = `
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${startDate.toLocaleDateString('it-IT')}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${startDate.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${personName}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${apt.aula_id?.nome || 'N/D'}</td>
+            <td class="px-6 py-4 text-sm text-gray-800">${apt.note || ''}</td>
+        `;
+        notesTableBody.appendChild(row);
+    });
+}
+
 
 // --- LOGICA PANNELLO DI AMMINISTRAZIONE ---
 
@@ -272,7 +386,6 @@ async function handleAdminDelete(id, type, name) {
     if (type === 'students' || type === 'teachers') {
         const { error: deleteError } = await sbClient.from('profiles').delete().eq('id', id);
         error = deleteError;
-        // Per una pulizia completa, l'utente dovrebbe essere eliminato anche dalla sezione Authentication.
     } else if (type === 'classrooms') {
         const { error: deleteError } = await sbClient.from('aule').delete().eq('id', id);
         error = deleteError;
@@ -287,6 +400,7 @@ async function handleAdminDelete(id, type, name) {
 
 function openAdminModal(type, item = null) {
     adminForm.reset();
+    adminFormError.textContent = '';
     adminEditId.value = item ? item.id : '';
     adminEditType.value = type;
 
@@ -326,6 +440,7 @@ function closeAdminModal() {
 
 async function handleAdminFormSubmit(event) {
     event.preventDefault();
+    adminFormError.textContent = '';
     const id = adminEditId.value;
     const type = adminEditType.value;
     const name = adminInputName.value;
@@ -341,21 +456,26 @@ async function handleAdminFormSubmit(event) {
         if (type === 'students' || type === 'teachers') {
             const email = adminInputEmail.value.trim();
             const password = adminInputPassword.value;
+
+            if (password.length < 6) {
+                adminFormError.textContent = "La password deve essere di almeno 6 caratteri.";
+                return;
+            }
             
-            // 1. Salva la sessione corrente dell'admin
             const { data: { session: adminSession }, error: sessionError } = await sbClient.auth.getSession();
              if (sessionError || !adminSession) {
-                alert('Errore di sessione, impossibile creare utente. Riprovare il login.');
+                adminFormError.textContent = 'Errore di sessione, impossibile creare utente. Riprovare il login.';
                 return;
             }
 
-            // 2. Crea il nuovo utente (questo fa il logout dell'admin temporaneamente)
             const { data: { user: newUser }, error: signUpError } = await sbClient.auth.signUp({ email, password });
 
             if (signUpError) {
-                error = signUpError;
-            } else if (newUser) {
-                // 3. Aggiorna il profilo del nuovo utente con nome e ruolo corretto
+                adminFormError.textContent = `Errore: ${signUpError.message}. Prova una password più robusta (con maiuscole, numeri o simboli).`;
+                return;
+            } 
+            
+            if (newUser) {
                 const newRole = type === 'students' ? 'student' : 'teacher';
                 const { error: updateError } = await sbClient.from('profiles')
                     .update({ nome: name, ruolo: newRole })
@@ -364,7 +484,6 @@ async function handleAdminFormSubmit(event) {
                 if (updateError) {
                     error = { message: `Utente creato, ma errore nell'aggiornare il profilo: ${updateError.message}` };
                 } else {
-                    // 4. Ripristina la sessione dell'admin
                     const { error: restoreError } = await sbClient.auth.setSession(adminSession);
                     if(restoreError) {
                         alert('Nuovo utente creato, ma si è verificato un errore nel ripristino della sessione. Si prega di effettuare nuovamente il login.');
@@ -379,7 +498,7 @@ async function handleAdminFormSubmit(event) {
     }
 
     if (error) {
-        alert(`Errore nel salvataggio: ${error.message}`);
+        adminFormError.textContent = `Errore nel salvataggio: ${error.message}`;
     } else {
         closeAdminModal();
         loadAdminData();
@@ -445,7 +564,7 @@ async function openModalForNew() {
     appointmentForm.reset();
     modalTitle.textContent = 'Nuovo Appuntamento';
     appointmentIdInput.value = '';
-    deleteButton.classList.add('hidden');
+    deleteButton.style.display = 'none';
     teacherSelectContainer.style.display = (currentUserRole === 'admin') ? '' : 'none';
     teacherSelect.required = (currentUserRole === 'admin');
 
@@ -519,15 +638,11 @@ appointmentForm.addEventListener('submit', async (event) => {
 
     let error;
     if (id) {
-        // Modifica appuntamento esistente
-        const { error: updateError } = await sbClient.from('appuntamenti').update(appointmentData).eq('id', id);
-        error = updateError;
+        ({ error } = await sbClient.from('appuntamenti').update(appointmentData).eq('id', id));
     } else {
-        // Crea nuovo appuntamento
         appointmentData.data_inizio = newAppointmentInfo.startStr;
         appointmentData.data_fine = newAppointmentInfo.endStr;
-        const { error: insertError } = await sbClient.from('appuntamenti').insert(appointmentData);
-        error = insertError;
+        ({ error } = await sbClient.from('appuntamenti').insert(appointmentData));
     }
 
     if (error) {
@@ -543,9 +658,7 @@ deleteButton.addEventListener('click', async () => {
     const id = appointmentIdInput.value;
     if(!id) return;
     
-    const isConfirmed = window.confirm("Sei sicuro di voler eliminare questo appuntamento?");
-
-    if(isConfirmed) {
+    if (window.confirm("Sei sicuro di voler eliminare questo appuntamento?")) {
         const { error } = await sbClient.from('appuntamenti').delete().eq('id', id);
         if(error) {
             alert("Errore durante l'eliminazione: " + error.message);
