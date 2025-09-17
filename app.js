@@ -3,7 +3,6 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 // --- CONFIGURAZIONE SUPABASE ---
 const SUPABASE_URL = 'https://nxkcnjzkjboorltirjad.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54a2NuanpramJvb3JsdGlyamFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4MDkyNzAsImV4cCI6MjA3MjM4NTI3MH0.E1tK4QOlhpTPMtmYLRZtTvDy5QT_wej25cZAMkBh4CM';
-
 const sbClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // --- RIFERIMENTI AGLI ELEMENTI DEL DOM ---
@@ -97,7 +96,7 @@ logoutButton.addEventListener('click', async () => {
     currentUser = null;
     currentUserRole = null;
     if (calendar) calendar.destroy();
-    window.location.reload(); // Ricarica per resettare lo stato
+    window.location.reload();
 });
 
 function showLoginScreen() {
@@ -121,7 +120,7 @@ async function loadUserDataAndRenderUI(user) {
         return;
     }
     currentUserRole = profile.ruolo;
-    currentUser.profile = profile; // Allega i dati del profilo all'utente corrente
+    currentUser.profile = profile;
     updateNavigation(profile.ruolo);
     initializeCalendar();
     showView('calendar');
@@ -155,21 +154,23 @@ async function checkUserSession() {
 
 function showView(viewName) {
     [calendarView, adminView, notesView].forEach(v => v.classList.add('hidden'));
-    document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+    document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active', 'font-bold'));
 
+    let activeLink;
     if (viewName === 'calendar') {
         calendarView.classList.remove('hidden');
-        document.getElementById('nav-calendar').classList.add('active');
-        if(currentUserRole === 'admin') setupTeacherFilter(calendarTeacherFilter, () => calendar.refetchEvents());
+        activeLink = document.getElementById('nav-calendar');
+        if (currentUserRole === 'admin') setupTeacherFilter(calendarTeacherFilter, () => calendar.refetchEvents());
     } else if (viewName === 'notes') {
         notesView.classList.remove('hidden');
-        document.getElementById('nav-notes').classList.add('active');
+        activeLink = document.getElementById('nav-notes');
         loadNotesViewData();
     } else if (viewName === 'admin') {
         adminView.classList.remove('hidden');
-        document.getElementById('nav-admin')?.classList.add('active');
+        activeLink = document.getElementById('nav-admin');
         loadAdminData();
     }
+    if (activeLink) activeLink.classList.add('active', 'font-bold');
 }
 
 function setupEventListeners() {
@@ -178,7 +179,10 @@ function setupEventListeners() {
     document.getElementById('nav-admin')?.addEventListener('click', (e) => { e.preventDefault(); showView('admin'); });
     Object.keys(adminTabs).forEach(key => adminTabs[key].addEventListener('click', () => showAdminTab(key)));
     Object.values(tableBodies).forEach(tbody => tbody.addEventListener('click', handleAdminTableClick));
-    [addStudentBtn, addTeacherBtn, addClassroomBtn].forEach(btn => btn.addEventListener('click', () => openAdminModal(btn.id.split('-')[1] + 's')));
+    [addStudentBtn, addTeacherBtn, addClassroomBtn].forEach(btn => btn.addEventListener('click', () => {
+        const type = btn.id.replace('add-', '').replace('-btn', '') + 's';
+        openAdminModal(type);
+    }));
     adminForm.addEventListener('submit', handleAdminFormSubmit);
     adminCancelButton.addEventListener('click', closeAdminModal);
     notesStudentFilter.addEventListener('change', () => renderAppointmentsTable(filterAppointments()));
@@ -198,15 +202,13 @@ async function loadNotesViewData() {
     notesTableStudentHeader.style.display = (isAdmin || isTeacher) ? '' : 'none';
     notesTableTeacherHeader.style.display = (isAdmin || currentUserRole === 'student') ? '' : 'none';
 
-    if (isAdmin) {
-        await setupTeacherFilter(notesTeacherFilter);
-    }
-
+    if (isAdmin) await setupTeacherFilter(notesTeacherFilter);
+    
     let query = sbClient.from('appuntamenti').select('*, studente_id(id, nome), insegnante_id(id, nome), aula_id(id, nome)');
     
     if (isAdmin) {
         const selectedTeacherId = notesTeacherFilter.value;
-        if (selectedTeacherId !== 'all') query = query.eq('insegnante_id', selectedTeacherId);
+        if (selectedTeacherId && selectedTeacherId !== 'all') query = query.eq('insegnante_id', selectedTeacherId);
     } else if (isTeacher) {
         query = query.eq('insegnante_id', currentUser.id);
     } else { // student
@@ -214,12 +216,10 @@ async function loadNotesViewData() {
     }
 
     const { data, error } = await query.order('data_inizio', { ascending: false });
-    if (error) {
-        console.error("Errore caricamento note:", error);
-        return;
-    }
+    if (error) { console.error("Errore caricamento note:", error); return; }
+    
     allAppointmentsForNotesView = data;
-    populateStudentFilter(data);
+    if(isTeacher || isAdmin) populateStudentFilter(data);
     renderAppointmentsTable(data);
 }
 
@@ -266,8 +266,9 @@ function renderAppointmentsTable(appointments) {
 // --- LOGICA PANNELLO DI AMMINISTRAZIONE ---
 
 function showAdminTab(tabName) {
-    Object.values(adminTabs).forEach(tab => tab.classList.remove('text-indigo-600', 'border-indigo-500'));
-    adminTabs[tabName].classList.add('text-indigo-600', 'border-indigo-500');
+    const baseClasses = 'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm';
+    Object.values(adminTabs).forEach(tab => tab.className = `${baseClasses} text-gray-500 hover:text-gray-700 hover:border-gray-300 border-transparent`);
+    adminTabs[tabName].className = `${baseClasses} text-indigo-600 border-indigo-500`;
     Object.values(adminContents).forEach(content => content.classList.add('hidden'));
     adminContents[tabName].classList.remove('hidden');
 }
@@ -289,14 +290,12 @@ function renderTable(type, data, columns) {
         columns.forEach(col => {
             const cell = document.createElement('td');
             cell.className = 'px-6 py-4 text-sm';
-            const keys = col.split('.');
-            let value = item;
-            for(const key of keys) { value = value ? value[key] : null; }
+            let value = col.split('.').reduce((o, i) => o?.[i], item);
             cell.textContent = value || '-';
             row.appendChild(cell);
         });
         const actionsCell = document.createElement('td');
-        actionsCell.className = 'px-6 py-4 space-x-2';
+        actionsCell.className = 'px-6 py-4 space-x-2 text-right';
         actionsCell.innerHTML = `
             <button class="text-indigo-600 hover:text-indigo-900 admin-edit-btn" data-id="${item.id}" data-type="${type}">Modifica</button>
             <button class="text-red-600 hover:text-red-900 admin-delete-btn" data-id="${item.id}" data-type="${type}" data-name="${item.nome || item.email}">Elimina</button>
@@ -308,10 +307,13 @@ function renderTable(type, data, columns) {
 
 async function handleAdminTableClick(event) {
     const target = event.target;
+    if (!target.dataset.id) return;
     const { id, type, name } = target.dataset;
+
     if (target.classList.contains('admin-edit-btn')) {
-        const { data } = await sbClient.from(type === 'classrooms' ? 'aule' : 'profiles').select('*').eq('id', id).single();
-        openAdminModal(type, data);
+        const fromTable = type === 'classrooms' ? 'aule' : 'profiles';
+        const { data } = await sbClient.from(fromTable).select('*').eq('id', id).single();
+        if (data) openAdminModal(type, data);
     }
     if (target.classList.contains('admin-delete-btn')) {
         handleAdminDelete(id, type, name);
@@ -335,22 +337,18 @@ async function openAdminModal(type, item = null) {
 
     const isProfile = type === 'students' || type === 'teachers';
     const isCreating = !item;
-
-    // Gestione visibilità con classList (corretto per Tailwind)
-    adminInputEmailContainer.classList.toggle('hidden', !isProfile);
-    adminInputPasswordContainer.classList.toggle('hidden', !(isProfile && isCreating));
-    adminDefaultClassroomContainer.classList.toggle('hidden', !(type === 'teachers' && !isCreating));
-
-    // Gestione dinamica dell'attributo 'required'
+    
+    adminInputEmailContainer.style.display = isProfile ? '' : 'none';
+    adminInputPasswordContainer.style.display = isProfile && isCreating ? '' : 'none';
+    adminDefaultClassroomContainer.style.display = type === 'teachers' && item ? '' : 'none';
+    
     adminInputEmail.required = isProfile && isCreating;
     adminInputPassword.required = isProfile && isCreating;
 
-    if (item) { // Modal in modalità MODIFICA
+    if (item) {
         adminInputName.value = item.nome;
-        if (isProfile) {
-            adminInputEmail.value = item.email;
-            adminInputEmail.readOnly = true;
-        }
+        if (isProfile) adminInputEmail.value = item.email;
+        adminInputEmail.readOnly = true;
         if (type === 'teachers') {
             const { data: aule } = await sbClient.from('aule').select('id, nome');
             adminDefaultClassroomSelect.innerHTML = '<option value="">Nessuna</option>';
@@ -362,30 +360,25 @@ async function openAdminModal(type, item = null) {
                 adminDefaultClassroomSelect.appendChild(option);
             });
         }
-    } else { // Modal in modalità CREAZIONE
-        if (isProfile) {
-            adminInputEmail.readOnly = false;
-        }
+    } else {
+        if (isProfile) adminInputEmail.readOnly = false;
     }
-
     adminModal.classList.remove('hidden');
     adminModal.classList.add('flex');
 }
-
 
 function closeAdminModal() {
     adminModal.classList.add('hidden');
     adminModal.classList.remove('flex');
 }
 
-// Funzione helper per attendere la creazione del profilo via trigger
 async function waitForProfile(userId, retries = 5, delay = 400) {
     for (let i = 0; i < retries; i++) {
         const { data } = await sbClient.from('profiles').select('id').eq('id', userId).single();
-        if (data) return data; // Profilo trovato
+        if (data) return data;
         await new Promise(res => setTimeout(res, delay));
     }
-    return null; // Profilo non trovato dopo i tentativi
+    return null;
 }
 
 async function handleAdminFormSubmit(event) {
@@ -419,20 +412,16 @@ async function handleAdminFormSubmit(event) {
             if (signUpError) {
                 error = signUpError;
             } else if (newUser) {
-                // Attendi che il trigger crei il profilo
                 const profileExists = await waitForProfile(newUser.id);
                 if (!profileExists) {
-                    error = { message: "Il profilo utente non è stato creato automaticamente. Riprova o contatta il supporto." };
+                    error = { message: "Il profilo utente non è stato creato automaticamente." };
                 } else {
                     const newRole = type === 'students' ? 'student' : 'teacher';
                     const { error: updateError } = await sbClient.from('profiles').update({ nome: name, ruolo: newRole }).eq('id', newUser.id);
-                    if (updateError) {
-                        error = { message: `Utente creato, ma errore nell'aggiornare il profilo: ${updateError.message}` };
-                    }
+                    if (updateError) error = { message: `Utente creato, ma errore nell'aggiornare il profilo: ${updateError.message}` };
                 }
             }
-            // Ripristina sempre la sessione admin alla fine
-            await sbClient.auth.setSession(adminSession);
+            if (adminSession) await sbClient.auth.setSession(adminSession);
         }
     }
 
@@ -456,32 +445,26 @@ async function setupTeacherFilter(selectElement, onChangeCallback) {
 }
 
 function getEventColor(classroomName) {
-    if (!classroomName) return '#4f46e5'; // Default color
+    if (!classroomName) return '#4f46e5';
     const name = classroomName.toLowerCase();
     const colors = {
-        'rossa': '#ef4444', 'rosso': '#ef4444',
-        'gialla': '#f59e0b', 'giallo': '#f59e0b',
-        'verde': '#10b981',
-        'blu': '#3b82f6',
-        'azzurra': '#60a5fa', 'azzurro': '#60a5fa',
-        'viola': '#8b5cf6',
-        'arancione': '#f97316'
+        'rossa': '#ef4444', 'rosso': '#ef4444', 'gialla': '#f59e0b', 'giallo': '#f59e0b',
+        'verde': '#10b981', 'blu': '#3b82f6', 'azzurra': '#60a5fa', 'azzurro': '#60a5fa',
+        'viola': '#8b5cf6', 'arancione': '#f97316'
     };
-    return colors[name] || '#6b7280'; // Grigio per altri nomi
+    return colors[name] || '#6b7280';
 }
 
 async function fetchEvents() {
     let query = sbClient.from('appuntamenti').select('*, studente_id(id, nome), insegnante_id(id, nome), aula_id(id, nome)');
-    
     if (currentUserRole === 'admin') {
         const selectedTeacherId = calendarTeacherFilter.value;
-        if (selectedTeacherId !== 'all') query = query.eq('insegnante_id', selectedTeacherId);
+        if (selectedTeacherId && selectedTeacherId !== 'all') query = query.eq('insegnante_id', selectedTeacherId);
     } else if (currentUserRole === 'teacher') {
         query = query.eq('insegnante_id', currentUser.id);
-    } else { // student
+    } else {
         query = query.eq('studente_id', currentUser.id);
     }
-    
     const { data, error } = await query;
     if (error) { console.error("Errore fetchEvents:", error); return []; }
     
@@ -508,11 +491,17 @@ async function fetchEvents() {
 function initializeCalendar() {
     const calendarEl = document.getElementById('calendar');
     if (calendar) calendar.destroy();
+    
+    const isMobile = window.innerWidth < 768;
     const isEditable = currentUserRole === 'admin' || currentUserRole === 'teacher';
 
     calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'timeGridWeek',
-        headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' },
+        initialView: isMobile ? 'listWeek' : 'timeGridWeek',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: isMobile ? 'listWeek,dayGridMonth' : 'dayGridMonth,timeGridWeek,timeGridDay'
+        },
         locale: 'it', slotMinTime: '08:00:00', slotMaxTime: '21:00:00', allDaySlot: false,
         selectable: isEditable, editable: isEditable,
         events: (info, success, fail) => fetchEvents().then(success).catch(fail),
@@ -529,9 +518,10 @@ async function openModalForNew() {
     modalTitle.textContent = 'Nuovo Appuntamento';
     appointmentIdInput.value = '';
     deleteButton.style.display = 'none';
+    appointmentNotes.readOnly = false;
 
-    [studentSelect, teacherSelect].forEach(el => { el.style.display = 'block'; });
-    [appointmentStudentName, appointmentTeacherName].forEach(el => { el.style.display = 'none'; });
+    [studentSelect, teacherSelect, classroomSelect].forEach(el => el.style.display = 'block');
+    [appointmentStudentName, appointmentTeacherName].forEach(el => el.style.display = 'none');
     
     const { start, end } = newAppointmentInfo;
     appointmentTime.textContent = `${start.toLocaleDateString('it-IT')} ${start.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})} - ${end.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})}`;
@@ -545,7 +535,6 @@ async function openModalForNew() {
     } else {
         teacherSelect.disabled = false;
     }
-
     modal.classList.remove('hidden');
     modal.classList.add('flex');
 }
@@ -558,26 +547,25 @@ async function openModalForEdit(event) {
     const canEdit = currentUserRole === 'admin' || (currentUserRole === 'teacher' && extendedProps.insegnante_id?.id === currentUser.id);
     
     deleteButton.style.display = canEdit ? '' : 'none';
+    document.querySelector('#appointment-form button[type="submit"]').style.display = canEdit ? '' : 'none';
     
     appointmentIdInput.value = id;
     appointmentTime.textContent = `${start.toLocaleDateString('it-IT')} ${start.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})} - ${end.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})}`;
     appointmentNotes.value = extendedProps.note || '';
 
     if (canEdit) {
-        [studentSelect, teacherSelect].forEach(el => { el.style.display = 'block'; });
-        [appointmentStudentName, appointmentTeacherName].forEach(el => { el.style.display = 'none'; });
+        [studentSelect, teacherSelect, classroomSelect].forEach(el => el.style.display = 'block');
+        [appointmentStudentName, appointmentTeacherName].forEach(el => el.style.display = 'none');
         await populateAppointmentSelects(extendedProps.studente_id?.id, extendedProps.aula_id?.id, extendedProps.insegnante_id?.id);
         teacherSelect.disabled = currentUserRole === 'teacher';
         appointmentNotes.readOnly = false;
-
-    } else { // Vista solo lettura per studenti
-        [studentSelect, teacherSelect, classroomSelect].forEach(el => { el.style.display = 'none'; });
-        [appointmentStudentName, appointmentTeacherName].forEach(el => { el.style.display = 'block'; });
+    } else {
+        [studentSelect, teacherSelect, classroomSelect].forEach(el => el.style.display = 'none');
+        [appointmentStudentName, appointmentTeacherName].forEach(el => el.style.display = 'block');
         appointmentStudentName.textContent = `Studente: ${extendedProps.studente_id?.nome || 'N/D'}`;
         appointmentTeacherName.textContent = `Insegnante: ${extendedProps.insegnante_id?.nome || 'N/D'}`;
         appointmentNotes.readOnly = true;
     }
-
     modal.classList.remove('hidden');
     modal.classList.add('flex');
 }
@@ -611,18 +599,11 @@ cancelButton.addEventListener('click', closeModal);
 
 appointmentForm.addEventListener('submit', async (event) => {
     event.preventDefault();
-
-    // Se l'utente non può modificare, esci subito
-    if (appointmentNotes.readOnly) {
-        closeModal();
-        return;
-    }
+    if (appointmentNotes.readOnly) { closeModal(); return; }
 
     const id = appointmentIdInput.value;
     const appointmentData = {
-        studente_id: studentSelect.value,
-        aula_id: classroomSelect.value,
-        note: appointmentNotes.value,
+        studente_id: studentSelect.value, aula_id: classroomSelect.value, note: appointmentNotes.value,
         insegnante_id: currentUserRole === 'teacher' ? currentUser.id : teacherSelect.value,
     };
 
@@ -634,7 +615,6 @@ appointmentForm.addEventListener('submit', async (event) => {
         appointmentData.data_fine = newAppointmentInfo.endStr;
         ({ error } = await sbClient.from('appuntamenti').insert(appointmentData));
     }
-
     if (error) alert("Errore: " + error.message);
     else { closeModal(); calendar.refetchEvents(); }
 });
