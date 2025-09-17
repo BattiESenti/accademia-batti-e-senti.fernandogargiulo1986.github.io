@@ -76,6 +76,8 @@ let currentUser = null;
 let currentUserRole = null;
 let newAppointmentInfo = null;
 let allAppointmentsForNotesView = [];
+let resizeTimeout;
+
 
 // --- LOGICA DI AUTENTENTICAZIONE E UI ---
 
@@ -187,6 +189,19 @@ function setupEventListeners() {
     adminCancelButton.addEventListener('click', closeAdminModal);
     notesStudentFilter.addEventListener('change', () => renderAppointmentsTable(filterAppointments()));
     notesTeacherFilter.addEventListener('change', () => loadNotesViewData());
+
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            if (calendar) {
+                const isMobile = window.innerWidth < 768;
+                const newView = isMobile ? 'listWeek' : 'timeGridWeek';
+                if (calendar.view.type !== newView) {
+                    initializeCalendar();
+                }
+            }
+        }, 250); // Debounce
+    });
 }
 
 // --- LOGICA VISTA APPUNTAMENTI & NOTE ---
