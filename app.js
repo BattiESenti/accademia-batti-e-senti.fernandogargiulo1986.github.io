@@ -98,6 +98,7 @@ logoutButton.addEventListener('click', async () => {
     currentUser = null;
     currentUserRole = null;
     if (calendar) calendar.destroy();
+    window.removeEventListener('resize', handleResize);
     window.location.reload();
 });
 
@@ -175,6 +176,19 @@ function showView(viewName) {
     if (activeLink) activeLink.classList.add('active', 'font-bold');
 }
 
+function handleResize() {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+        if (calendar) {
+            const isMobile = window.innerWidth < 768;
+            const newView = isMobile ? 'timeGridDay' : 'timeGridWeek';
+            if (calendar.view.type !== newView) {
+                initializeCalendar(); // Re-inizializza per applicare tutte le opzioni responsive
+            }
+        }
+    }, 250);
+}
+
 function setupEventListeners() {
     document.getElementById('nav-calendar').addEventListener('click', (e) => { e.preventDefault(); showView('calendar'); });
     document.getElementById('nav-notes').addEventListener('click', (e) => { e.preventDefault(); showView('notes'); });
@@ -190,18 +204,7 @@ function setupEventListeners() {
     notesStudentFilter.addEventListener('change', () => renderAppointmentsTable(filterAppointments()));
     notesTeacherFilter.addEventListener('change', () => loadNotesViewData());
 
-    window.addEventListener('resize', () => {
-        clearTimeout(resizeTimeout);
-        resizeTimeout = setTimeout(() => {
-            if (calendar) {
-                const isMobile = window.innerWidth < 768;
-                const newView = isMobile ? 'listWeek' : 'timeGridWeek';
-                if (calendar.view.type !== newView) {
-                    initializeCalendar();
-                }
-            }
-        }, 250); // Debounce
-    });
+    window.addEventListener('resize', handleResize);
 }
 
 // --- LOGICA VISTA APPUNTAMENTI & NOTE ---
@@ -522,11 +525,11 @@ function initializeCalendar() {
     const isEditable = currentUserRole === 'admin' || currentUserRole === 'teacher';
 
     calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: isMobile ? 'listWeek' : 'timeGridWeek',
+        initialView: isMobile ? 'timeGridDay' : 'timeGridWeek',
         headerToolbar: {
             left: 'prev,next today',
             center: 'title',
-            right: isMobile ? 'listWeek,dayGridMonth' : 'dayGridMonth,timeGridWeek,timeGridDay'
+            right: isMobile ? 'timeGridDay,listWeek' : 'dayGridMonth,timeGridWeek,timeGridDay'
         },
         locale: 'it', slotMinTime: '08:00:00', slotMaxTime: '21:00:00', allDaySlot: false,
         selectable: isEditable, editable: isEditable,
