@@ -338,17 +338,19 @@ async function openAdminModal(type, item = null) {
     const isProfile = type === 'students' || type === 'teachers';
     const isCreating = !item;
     
-    adminInputEmailContainer.style.display = isProfile ? '' : 'none';
-    adminInputPasswordContainer.style.display = isProfile && isCreating ? '' : 'none';
-    adminDefaultClassroomContainer.style.display = type === 'teachers' && item ? '' : 'none';
+    adminInputEmailContainer.classList.toggle('hidden', !isProfile);
+    adminInputPasswordContainer.classList.toggle('hidden', !(isProfile && isCreating));
+    adminDefaultClassroomContainer.classList.toggle('hidden', !(type === 'teachers' && item));
     
     adminInputEmail.required = isProfile && isCreating;
     adminInputPassword.required = isProfile && isCreating;
 
     if (item) {
         adminInputName.value = item.nome;
-        if (isProfile) adminInputEmail.value = item.email;
-        adminInputEmail.readOnly = true;
+        if (isProfile) {
+            adminInputEmail.value = item.email;
+            adminInputEmail.readOnly = true;
+        }
         if (type === 'teachers') {
             const { data: aule } = await sbClient.from('aule').select('id, nome');
             adminDefaultClassroomSelect.innerHTML = '<option value="">Nessuna</option>';
@@ -478,15 +480,24 @@ async function fetchEvents() {
     }));
 
     if (currentUserRole === 'teacher') {
-        const { data: occupied } = await sbClient.rpc('get_occupied_slots');
-        if (occupied) {
-            allEvents.push(...occupied.filter(s => s.insegnante_id !== currentUser.id).map(s => ({
-                title: 'Occupato', start: s.data_inizio, end: s.data_fine, display: 'background', color: '#e5e7eb'
-            })));
+        const { data: occupied, error: rpcError } = await sbClient.rpc('get_occupied_slots');
+        if (rpcError) { console.error("Errore RPC:", rpcError); }
+        else if (occupied) {
+            allEvents.push(...occupied
+                .filter(s => s.insegnante_id !== currentUser.id)
+                .map(s => ({
+                    title: 'Occupato',
+                    start: s.data_inizio,
+                    end: s.data_fine,
+                    display: 'background',
+                    backgroundColor: getEventColor(s.aula_nome),
+                }))
+            );
         }
     }
     return allEvents;
 }
+
 
 function initializeCalendar() {
     const calendarEl = document.getElementById('calendar');
@@ -630,3 +641,4 @@ deleteButton.addEventListener('click', async () => {
 
 // --- INIZIALIZZAZIONE ---
 checkUserSession();
+
