@@ -76,8 +76,6 @@ let currentUser = null;
 let currentUserRole = null;
 let newAppointmentInfo = null;
 let allAppointmentsForNotesView = [];
-let resizeTimeout;
-
 
 // --- LOGICA DI AUTENTENTICAZIONE E UI ---
 
@@ -98,7 +96,6 @@ logoutButton.addEventListener('click', async () => {
     currentUser = null;
     currentUserRole = null;
     if (calendar) calendar.destroy();
-    window.removeEventListener('resize', handleResize);
     window.location.reload();
 });
 
@@ -176,19 +173,6 @@ function showView(viewName) {
     if (activeLink) activeLink.classList.add('active', 'font-bold');
 }
 
-function handleResize() {
-    clearTimeout(resizeTimeout);
-    resizeTimeout = setTimeout(() => {
-        if (calendar) {
-            const isMobile = window.innerWidth < 768;
-            const newView = isMobile ? 'timeGridDay' : 'timeGridWeek';
-            if (calendar.view.type !== newView) {
-                initializeCalendar(); // Re-inizializza per applicare tutte le opzioni responsive
-            }
-        }
-    }, 250);
-}
-
 function setupEventListeners() {
     document.getElementById('nav-calendar').addEventListener('click', (e) => { e.preventDefault(); showView('calendar'); });
     document.getElementById('nav-notes').addEventListener('click', (e) => { e.preventDefault(); showView('notes'); });
@@ -203,8 +187,6 @@ function setupEventListeners() {
     adminCancelButton.addEventListener('click', closeAdminModal);
     notesStudentFilter.addEventListener('change', () => renderAppointmentsTable(filterAppointments()));
     notesTeacherFilter.addEventListener('change', () => loadNotesViewData());
-
-    window.addEventListener('resize', handleResize);
 }
 
 // --- LOGICA VISTA APPUNTAMENTI & NOTE ---
@@ -392,15 +374,6 @@ function closeAdminModal() {
     adminModal.classList.remove('flex');
 }
 
-async function waitForProfile(userId, retries = 5, delay = 400) {
-    for (let i = 0; i < retries; i++) {
-        const { data } = await sbClient.from('profiles').select('id').eq('id', userId).single();
-        if (data) return data;
-        await new Promise(res => setTimeout(res, delay));
-    }
-    return null;
-}
-
 async function handleAdminFormSubmit(event) {
     event.preventDefault();
     adminFormError.textContent = '';
@@ -426,28 +399,42 @@ async function handleAdminFormSubmit(event) {
                 adminFormError.textContent = "La password deve essere di almeno 6 caratteri.";
                 return;
             }
+
             const { data: { session: adminSession } } = await sbClient.auth.getSession();
-            const { data: { user: newUser }, error: signUpError } = await sbClient.auth.signUp({ email, password });
-            
-            if (signUpError) {
-                error = signUpError;
-            } else if (newUser) {
-                const profileExists = await waitForProfile(newUser.id);
-                if (!profileExists) {
-                    error = { message: "Il profilo utente non è stato creato automaticamente." };
-                } else {
-                    const newRole = type === 'students' ? 'student' : 'teacher';
-                    const { error: updateError } = await sbClient.from('profiles').update({ nome: name, ruolo: newRole }).eq('id', newUser.id);
-                    if (updateError) error = { message: `Utente creato, ma errore nell'aggiornare il profilo: ${updateError.message}` };
+            const newRole = type === 'students' ? 'student' : 'teacher';
+
+            // Il nostro trigger 'handle_new_user' ora gestisce la creazione del profilo
+            // passando i dati in 'options.data'.
+            const { error: signUpError } = await sbClient.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: {
+                        nome: name,
+                        ruolo: newRole
+                    }
                 }
+            });
+
+            if(signUpError) {
+                error = signUpError;
             }
-            if (adminSession) await sbClient.auth.setSession(adminSession);
+
+            // Ripristina la sessione dell'admin. È importante farlo sempre.
+            if (adminSession) {
+                await sbClient.auth.setSession(adminSession);
+            }
         }
     }
 
-    if (error) adminFormError.textContent = `Errore: ${error.message}`;
-    else { closeAdminModal(); loadAdminData(); }
+    if (error) {
+        adminFormError.textContent = `Errore: ${error.message}`;
+    } else {
+        closeAdminModal();
+        loadAdminData();
+    }
 }
+
 
 // --- LOGICA DEL CALENDARIO ---
 
@@ -497,25 +484,27 @@ async function fetchEvents() {
         extendedProps: { ...apt }
     }));
 
-    if (currentUserRole === 'teacher') {
+    if (currentUserRole === 'teacher' || currentUserRole === 'admin') {
         const { data: occupied, error: rpcError } = await sbClient.rpc('get_occupied_slots');
-        if (rpcError) { console.error("Errore RPC:", rpcError); }
-        else if (occupied) {
-            allEvents.push(...occupied
-                .filter(s => s.insegnante_id !== currentUser.id)
-                .map(s => ({
-                    title: 'Occupato',
-                    start: s.data_inizio,
-                    end: s.data_fine,
-                    display: 'background',
-                    backgroundColor: getEventColor(s.aula_nome),
-                }))
-            );
+        if (occupied && !rpcError) {
+            const otherTeachersSlots = occupied.filter(s => s.insegnante_id !== currentUser.id);
+             otherTeachersSlots.forEach(slot => {
+                const event = {
+                    title: `Occupato (${slot.aula_nome})`,
+                    start: slot.data_inizio,
+                    end: slot.data_fine,
+                    display: 'block', // 'block' per vederli affiancati
+                    backgroundColor: getEventColor(slot.aula_nome),
+                    borderColor: getEventColor(slot.aula_nome),
+                    editable: false,
+                    extendedProps: { isOccupied: true }
+                };
+                allEvents.push(event);
+            });
         }
     }
     return allEvents;
 }
-
 
 function initializeCalendar() {
     const calendarEl = document.getElementById('calendar');
@@ -525,17 +514,20 @@ function initializeCalendar() {
     const isEditable = currentUserRole === 'admin' || currentUserRole === 'teacher';
 
     calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: isMobile ? 'timeGridDay' : 'timeGridWeek',
+        initialView: isMobile ? 'listWeek' : 'timeGridWeek',
         headerToolbar: {
             left: 'prev,next today',
             center: 'title',
-            right: isMobile ? 'timeGridDay,listWeek' : 'dayGridMonth,timeGridWeek,timeGridDay'
+            right: isMobile ? 'listWeek,dayGridMonth' : 'dayGridMonth,timeGridWeek,timeGridDay'
         },
         locale: 'it', slotMinTime: '08:00:00', slotMaxTime: '21:00:00', allDaySlot: false,
         selectable: isEditable, editable: isEditable,
         events: (info, success, fail) => fetchEvents().then(success).catch(fail),
         select: (info) => { if (isEditable) { newAppointmentInfo = info; openModalForNew(); } },
-        eventClick: (info) => { if (info.event.display !== 'background') openModalForEdit(info.event); }
+        eventClick: (info) => { 
+            if (info.event.extendedProps.isOccupied) return; // Non aprire modale per slot "Occupato"
+            if (info.event.display !== 'background') openModalForEdit(info.event); 
+        }
     });
     calendar.render();
 }
@@ -548,9 +540,10 @@ async function openModalForNew() {
     appointmentIdInput.value = '';
     deleteButton.style.display = 'none';
     appointmentNotes.readOnly = false;
+    document.querySelector('#appointment-form button[type="submit"]').style.display = '';
 
-    [studentSelect, teacherSelect, classroomSelect].forEach(el => el.style.display = 'block');
-    [appointmentStudentName, appointmentTeacherName].forEach(el => el.style.display = 'none');
+    [studentSelect, teacherSelect, classroomSelect].forEach(el => { el.style.display = 'block'; });
+    [appointmentStudentName, appointmentTeacherName].forEach(el => { el.style.display = 'none'; });
     
     const { start, end } = newAppointmentInfo;
     appointmentTime.textContent = `${start.toLocaleDateString('it-IT')} ${start.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})} - ${end.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})}`;
@@ -581,19 +574,18 @@ async function openModalForEdit(event) {
     appointmentIdInput.value = id;
     appointmentTime.textContent = `${start.toLocaleDateString('it-IT')} ${start.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})} - ${end.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})}`;
     appointmentNotes.value = extendedProps.note || '';
+    appointmentNotes.readOnly = !canEdit;
 
     if (canEdit) {
-        [studentSelect, teacherSelect, classroomSelect].forEach(el => el.style.display = 'block');
-        [appointmentStudentName, appointmentTeacherName].forEach(el => el.style.display = 'none');
+        [studentSelect, teacherSelect, classroomSelect].forEach(el => { el.style.display = 'block'; });
+        [appointmentStudentName, appointmentTeacherName].forEach(el => { el.style.display = 'none'; });
         await populateAppointmentSelects(extendedProps.studente_id?.id, extendedProps.aula_id?.id, extendedProps.insegnante_id?.id);
         teacherSelect.disabled = currentUserRole === 'teacher';
-        appointmentNotes.readOnly = false;
     } else {
-        [studentSelect, teacherSelect, classroomSelect].forEach(el => el.style.display = 'none');
-        [appointmentStudentName, appointmentTeacherName].forEach(el => el.style.display = 'block');
+        [studentSelect, teacherSelect, classroomSelect].forEach(el => { el.style.display = 'none'; });
+        [appointmentStudentName, appointmentTeacherName].forEach(el => { el.style.display = 'block'; });
         appointmentStudentName.textContent = `Studente: ${extendedProps.studente_id?.nome || 'N/D'}`;
         appointmentTeacherName.textContent = `Insegnante: ${extendedProps.insegnante_id?.nome || 'N/D'}`;
-        appointmentNotes.readOnly = true;
     }
     modal.classList.remove('hidden');
     modal.classList.add('flex');
