@@ -274,12 +274,10 @@ function showAdminTab(tabName) {
 }
 
 async function loadAdminData() {
-    // Chiama la nuova funzione RPC sicura per ottenere i dati completi
     const { data: profiles, error: profilesError } = await sbClient.rpc('get_all_user_profiles');
     
     if (profilesError) {
         console.error("Errore caricamento profili:", profilesError);
-        // Mostra un errore nelle tabelle
         renderTable('students', null, ['nome', 'email']);
         renderTable('teachers', null, ['nome', 'email', 'aula_default_nome']);
         return;
@@ -293,20 +291,20 @@ async function loadAdminData() {
     
     const { data: classrooms, error: cError } = await sbClient.from('aule').select('id, nome');
     if (cError) console.error("Errore caricamento aule:", cError);
-    renderTable('classrooms', classrooms, ['nome']);
+    else renderTable('classrooms', classrooms, ['nome']);
 }
-
 
 function renderTable(type, data, columns) {
     const tbody = tableBodies[type];
     tbody.innerHTML = '';
 
+    // Aggiunto controllo per dati nulli o indefiniti per prevenire crash
     if (!data) {
         const colspan = columns.length + 1;
-        tbody.innerHTML = `<tr><td colspan="${colspan}" class="px-6 py-4 text-center text-red-500">Errore nel caricamento dei dati.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${colspan}" class="px-6 py-4 text-center text-red-500">Errore nel caricamento dei dati. Controlla la console per i dettagli.</td></tr>`;
         return;
     }
-    
+
     if (data.length === 0) {
         const colspan = columns.length + 1;
         tbody.innerHTML = `<tr><td colspan="${colspan}" class="px-6 py-4 text-center text-gray-500">Nessun dato disponibile.</td></tr>`;
@@ -344,15 +342,16 @@ async function handleAdminTableClick(event) {
             const { data } = await sbClient.from('aule').select('*').eq('id', id).single();
             itemData = data;
         } else {
-             const { data: profiles } = await sbClient.rpc('get_all_user_profiles');
-             if(profiles) itemData = profiles.find(p => p.id === id);
+            const { data: profiles } = await sbClient.rpc('get_all_user_profiles');
+            itemData = profiles?.find(p => p.id === id);
         }
         if (itemData) openAdminModal(type, itemData);
-    }
-    if (target.classList.contains('admin-delete-btn')) {
+
+    } else if (target.classList.contains('admin-delete-btn')) {
         handleAdminDelete(id, type, name);
     }
 }
+
 
 async function handleAdminDelete(id, type, name) {
     if (!window.confirm(`Sei sicuro di voler eliminare "${name}"?`)) return;
@@ -374,12 +373,12 @@ async function openAdminModal(type, item = null) {
     
     adminInputEmailContainer.classList.toggle('hidden', !isProfile);
     adminInputPasswordContainer.classList.toggle('hidden', !(isProfile && isCreating));
-    adminDefaultClassroomContainer.classList.toggle('hidden', !(type === 'teachers' && item));
+    adminDefaultClassroomContainer.classList.toggle('hidden', !(type === 'teachers'));
     
     adminInputEmail.required = isProfile && isCreating;
     adminInputPassword.required = isProfile && isCreating;
 
-    if (item) {
+    if (item) { // Edit mode
         adminInputName.value = item.nome;
         if (isProfile) {
             adminInputEmail.value = item.email;
@@ -396,8 +395,20 @@ async function openAdminModal(type, item = null) {
                 adminDefaultClassroomSelect.appendChild(option);
             });
         }
-    } else {
-        if (isProfile) adminInputEmail.readOnly = false;
+    } else { // Create mode
+        if (isProfile) {
+             adminInputEmail.readOnly = false;
+        }
+        if (type === 'teachers') {
+            const { data: aule } = await sbClient.from('aule').select('id, nome');
+            adminDefaultClassroomSelect.innerHTML = '<option value="">Nessuna</option>';
+            aule.forEach(a => {
+                const option = document.createElement('option');
+                option.value = a.id;
+                option.textContent = a.nome;
+                adminDefaultClassroomSelect.appendChild(option);
+            });
+        }
     }
     adminModal.classList.remove('hidden');
     adminModal.classList.add('flex');
@@ -417,15 +428,12 @@ async function handleAdminFormSubmit(event) {
     let error;
 
     if (id) { // Edit
-        if (type === 'classrooms') {
-            ({ error } = await sbClient.from('aule').update({ nome: name }).eq('id', id));
-        } else {
-            const updateData = { nome: name };
-            if (type === 'teachers') {
-                updateData.aula_default_id = adminDefaultClassroomSelect.value || null;
-            }
-            ({ error } = await sbClient.from('profiles').update(updateData).eq('id', id));
+        const fromTable = type === 'classrooms' ? 'aule' : 'profiles';
+        const updateData = { nome: name };
+        if (type === 'teachers') {
+            updateData.aula_default_id = adminDefaultClassroomSelect.value || null;
         }
+        ({ error } = await sbClient.from(fromTable).update(updateData).eq('id', id));
     } else { // Create
         if (type === 'classrooms') {
             ({ error } = await sbClient.from('aule').insert({ nome: name }));
@@ -436,8 +444,10 @@ async function handleAdminFormSubmit(event) {
                 adminFormError.textContent = "La password deve essere di almeno 6 caratteri.";
                 return;
             }
+
             const { data: { session: adminSession } } = await sbClient.auth.getSession();
             const newRole = type === 'students' ? 'student' : 'teacher';
+            const defaultClassroom = (type === 'teachers') ? adminDefaultClassroomSelect.value || null : null;
             
             const { error: signUpError } = await sbClient.auth.signUp({
                 email,
@@ -445,12 +455,13 @@ async function handleAdminFormSubmit(event) {
                 options: {
                     data: {
                         nome: name,
-                        ruolo: newRole
+                        ruolo: newRole,
+                        aula_default_id: defaultClassroom
                     }
                 }
             });
 
-            if (signUpError) {
+            if(signUpError) {
                 error = signUpError;
             }
             
@@ -467,7 +478,6 @@ async function handleAdminFormSubmit(event) {
         loadAdminData();
     }
 }
-
 
 // --- LOGICA DEL CALENDARIO ---
 
