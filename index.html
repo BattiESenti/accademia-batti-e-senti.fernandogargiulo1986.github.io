@@ -23,6 +23,20 @@
         .fc .fc-button-primary:not(:disabled):active { background-color: #3730a3; border-color: #3730a3; }
         .nav-link.active { background-color: #e5e7eb; font-weight: bold; }
         .modal-body { max-height: 80vh; overflow-y: auto; }
+
+        /* Media Query per migliorare la responsività su mobile */
+        @media (max-width: 640px) {
+            .fc .fc-toolbar-title {
+                font-size: 1.125rem; /* Riduci la dimensione del titolo */
+            }
+            .fc .fc-button {
+                padding: 0.25rem 0.5rem; /* Riduci il padding dei pulsanti */
+                font-size: 0.75rem; /* Riduci la dimensione del testo dei pulsanti */
+            }
+            .fc-list-event-title a, .fc-daygrid-event-dot {
+                font-size: 0.875rem; /* Riduci la dimensione del testo degli eventi */
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-100 h-full">
