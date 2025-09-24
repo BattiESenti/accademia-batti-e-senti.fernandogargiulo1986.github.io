@@ -561,11 +561,11 @@ function initializeCalendar() {
     const isEditable = currentUserRole === 'admin' || currentUserRole === 'teacher';
 
     calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: isMobile ? 'listWeek' : 'timeGridWeek',
+        initialView: isMobile ? 'timeGridDay' : 'timeGridWeek',
         headerToolbar: {
             left: 'prev,next today',
             center: 'title',
-            right: isMobile ? 'listWeek,dayGridMonth' : 'dayGridMonth,timeGridWeek,timeGridDay'
+            right: isMobile ? 'timeGridDay,listWeek' : 'dayGridMonth,timeGridWeek,timeGridDay'
         },
         locale: 'it', slotMinTime: '08:00:00', slotMaxTime: '21:00:00', allDaySlot: false,
         selectable: isEditable, editable: isEditable,
