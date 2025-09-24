@@ -274,30 +274,39 @@ function showAdminTab(tabName) {
 }
 
 async function loadAdminData() {
-    const { data: students, error: sError } = await sbClient.from('profiles').select('id, nome, email').eq('ruolo', 'student');
-    if (sError) console.error("Errore caricamento studenti:", sError);
+    // Chiama la nuova funzione RPC sicura per ottenere i dati completi
+    const { data: profiles, error: profilesError } = await sbClient.rpc('get_all_user_profiles');
+    
+    if (profilesError) {
+        console.error("Errore caricamento profili:", profilesError);
+        // Mostra un errore nelle tabelle
+        renderTable('students', null, ['nome', 'email']);
+        renderTable('teachers', null, ['nome', 'email', 'aula_default_nome']);
+        return;
+    }
+
+    const students = profiles.filter(p => p.ruolo === 'student');
+    const teachers = profiles.filter(p => p.ruolo === 'teacher');
+    
     renderTable('students', students, ['nome', 'email']);
-
-    const { data: teachers, error: tError } = await sbClient.from('profiles').select('*, aula_default_id(id, nome)').eq('ruolo', 'teacher');
-    if (tError) console.error("Errore caricamento insegnanti:", tError);
-    renderTable('teachers', teachers, ['nome', 'email', 'aula_default_id.nome']);
-
+    renderTable('teachers', teachers, ['nome', 'email', 'aula_default_nome']);
+    
     const { data: classrooms, error: cError } = await sbClient.from('aule').select('id, nome');
     if (cError) console.error("Errore caricamento aule:", cError);
     renderTable('classrooms', classrooms, ['nome']);
 }
 
+
 function renderTable(type, data, columns) {
     const tbody = tableBodies[type];
     tbody.innerHTML = '';
-    
-    // Aggiunto controllo per dati nulli o indefiniti per prevenire crash
+
     if (!data) {
         const colspan = columns.length + 1;
-        tbody.innerHTML = `<tr><td colspan="${colspan}" class="px-6 py-4 text-center text-red-500">Errore nel caricamento dei dati. Controlla la console per i dettagli.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${colspan}" class="px-6 py-4 text-center text-red-500">Errore nel caricamento dei dati.</td></tr>`;
         return;
     }
-
+    
     if (data.length === 0) {
         const colspan = columns.length + 1;
         tbody.innerHTML = `<tr><td colspan="${colspan}" class="px-6 py-4 text-center text-gray-500">Nessun dato disponibile.</td></tr>`;
@@ -330,9 +339,15 @@ async function handleAdminTableClick(event) {
     const { id, type, name } = target.dataset;
 
     if (target.classList.contains('admin-edit-btn')) {
-        const fromTable = type === 'classrooms' ? 'aule' : 'profiles';
-        const { data } = await sbClient.from(fromTable).select('*').eq('id', id).single();
-        if (data) openAdminModal(type, data);
+        let itemData;
+        if (type === 'classrooms') {
+            const { data } = await sbClient.from('aule').select('*').eq('id', id).single();
+            itemData = data;
+        } else {
+             const { data: profiles } = await sbClient.rpc('get_all_user_profiles');
+             if(profiles) itemData = profiles.find(p => p.id === id);
+        }
+        if (itemData) openAdminModal(type, itemData);
     }
     if (target.classList.contains('admin-delete-btn')) {
         handleAdminDelete(id, type, name);
@@ -402,12 +417,15 @@ async function handleAdminFormSubmit(event) {
     let error;
 
     if (id) { // Edit
-        const fromTable = type === 'classrooms' ? 'aule' : 'profiles';
-        const updateData = { nome: name };
-        if (type === 'teachers') {
-            updateData.aula_default_id = adminDefaultClassroomSelect.value || null;
+        if (type === 'classrooms') {
+            ({ error } = await sbClient.from('aule').update({ nome: name }).eq('id', id));
+        } else {
+            const updateData = { nome: name };
+            if (type === 'teachers') {
+                updateData.aula_default_id = adminDefaultClassroomSelect.value || null;
+            }
+            ({ error } = await sbClient.from('profiles').update(updateData).eq('id', id));
         }
-        ({ error } = await sbClient.from(fromTable).update(updateData).eq('id', id));
     } else { // Create
         if (type === 'classrooms') {
             ({ error } = await sbClient.from('aule').insert({ nome: name }));
@@ -421,7 +439,6 @@ async function handleAdminFormSubmit(event) {
             const { data: { session: adminSession } } = await sbClient.auth.getSession();
             const newRole = type === 'students' ? 'student' : 'teacher';
             
-            // Passiamo nome e ruolo come metadata, che il trigger 'handle_new_user' userà
             const { error: signUpError } = await sbClient.auth.signUp({
                 email,
                 password,
@@ -437,7 +454,6 @@ async function handleAdminFormSubmit(event) {
                 error = signUpError;
             }
             
-            // Ripristina la sessione dell'admin
             if (adminSession) {
                 await sbClient.auth.setSession(adminSession);
             }
@@ -668,3 +684,4 @@ deleteButton.addEventListener('click', async () => {
 
 // --- INIZIALIZZAZIONE ---
 checkUserSession();
+
