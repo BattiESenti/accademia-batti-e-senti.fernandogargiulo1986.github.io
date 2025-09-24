@@ -274,17 +274,36 @@ function showAdminTab(tabName) {
 }
 
 async function loadAdminData() {
-    const { data: students } = await sbClient.from('profiles').select('id, nome, email').eq('ruolo', 'student');
+    const { data: students, error: sError } = await sbClient.from('profiles').select('id, nome, email').eq('ruolo', 'student');
+    if (sError) console.error("Errore caricamento studenti:", sError);
     renderTable('students', students, ['nome', 'email']);
-    const { data: teachers } = await sbClient.from('profiles').select('*, aula_default_id(id, nome)').eq('ruolo', 'teacher');
+
+    const { data: teachers, error: tError } = await sbClient.from('profiles').select('*, aula_default_id(id, nome)').eq('ruolo', 'teacher');
+    if (tError) console.error("Errore caricamento insegnanti:", tError);
     renderTable('teachers', teachers, ['nome', 'email', 'aula_default_id.nome']);
-    const { data: classrooms } = await sbClient.from('aule').select('id, nome');
+
+    const { data: classrooms, error: cError } = await sbClient.from('aule').select('id, nome');
+    if (cError) console.error("Errore caricamento aule:", cError);
     renderTable('classrooms', classrooms, ['nome']);
 }
 
 function renderTable(type, data, columns) {
     const tbody = tableBodies[type];
     tbody.innerHTML = '';
+    
+    // Aggiunto controllo per dati nulli o indefiniti per prevenire crash
+    if (!data) {
+        const colspan = columns.length + 1;
+        tbody.innerHTML = `<tr><td colspan="${colspan}" class="px-6 py-4 text-center text-red-500">Errore nel caricamento dei dati. Controlla la console per i dettagli.</td></tr>`;
+        return;
+    }
+
+    if (data.length === 0) {
+        const colspan = columns.length + 1;
+        tbody.innerHTML = `<tr><td colspan="${colspan}" class="px-6 py-4 text-center text-gray-500">Nessun dato disponibile.</td></tr>`;
+        return;
+    }
+
     data.forEach(item => {
         const row = document.createElement('tr');
         columns.forEach(col => {
@@ -649,4 +668,3 @@ deleteButton.addEventListener('click', async () => {
 
 // --- INIZIALIZZAZIONE ---
 checkUserSession();
-
