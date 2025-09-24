@@ -298,7 +298,6 @@ function renderTable(type, data, columns) {
     const tbody = tableBodies[type];
     tbody.innerHTML = '';
 
-    // Aggiunto controllo per dati nulli o indefiniti per prevenire crash
     if (!data) {
         const colspan = columns.length + 1;
         tbody.innerHTML = `<tr><td colspan="${colspan}" class="px-6 py-4 text-center text-red-500">Errore nel caricamento dei dati. Controlla la console per i dettagli.</td></tr>`;
