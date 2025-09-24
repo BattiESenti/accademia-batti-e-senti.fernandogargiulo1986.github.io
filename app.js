@@ -399,12 +399,10 @@ async function handleAdminFormSubmit(event) {
                 adminFormError.textContent = "La password deve essere di almeno 6 caratteri.";
                 return;
             }
-
             const { data: { session: adminSession } } = await sbClient.auth.getSession();
             const newRole = type === 'students' ? 'student' : 'teacher';
-
-            // Il nostro trigger 'handle_new_user' ora gestisce la creazione del profilo
-            // passando i dati in 'options.data'.
+            
+            // Passiamo nome e ruolo come metadata, che il trigger 'handle_new_user' userà
             const { error: signUpError } = await sbClient.auth.signUp({
                 email,
                 password,
@@ -416,11 +414,11 @@ async function handleAdminFormSubmit(event) {
                 }
             });
 
-            if(signUpError) {
+            if (signUpError) {
                 error = signUpError;
             }
-
-            // Ripristina la sessione dell'admin. È importante farlo sempre.
+            
+            // Ripristina la sessione dell'admin
             if (adminSession) {
                 await sbClient.auth.setSession(adminSession);
             }
@@ -493,7 +491,7 @@ async function fetchEvents() {
                     title: `Occupato (${slot.aula_nome})`,
                     start: slot.data_inizio,
                     end: slot.data_fine,
-                    display: 'block', // 'block' per vederli affiancati
+                    display: 'block',
                     backgroundColor: getEventColor(slot.aula_nome),
                     borderColor: getEventColor(slot.aula_nome),
                     editable: false,
@@ -525,7 +523,7 @@ function initializeCalendar() {
         events: (info, success, fail) => fetchEvents().then(success).catch(fail),
         select: (info) => { if (isEditable) { newAppointmentInfo = info; openModalForNew(); } },
         eventClick: (info) => { 
-            if (info.event.extendedProps.isOccupied) return; // Non aprire modale per slot "Occupato"
+            if (info.event.extendedProps.isOccupied) return;
             if (info.event.display !== 'background') openModalForEdit(info.event); 
         }
     });
