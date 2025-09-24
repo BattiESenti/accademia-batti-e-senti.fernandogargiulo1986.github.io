@@ -187,6 +187,12 @@ function setupEventListeners() {
     adminCancelButton.addEventListener('click', closeAdminModal);
     notesStudentFilter.addEventListener('change', () => renderAppointmentsTable(filterAppointments()));
     notesTeacherFilter.addEventListener('change', () => loadNotesViewData());
+
+    window.addEventListener('resize', () => {
+        if (calendar) {
+            initializeCalendar();
+        }
+    });
 }
 
 // --- LOGICA VISTA APPUNTAMENTI & NOTE ---
@@ -300,7 +306,7 @@ function renderTable(type, data, columns) {
 
     if (!data) {
         const colspan = columns.length + 1;
-        tbody.innerHTML = `<tr><td colspan="${colspan}" class="px-6 py-4 text-center text-red-500">Errore nel caricamento dei dati. Controlla la console per i dettagli.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${colspan}" class="px-6 py-4 text-center text-red-500">Errore nel caricamento dei dati. Controlla la console.</td></tr>`;
         return;
     }
 
@@ -350,7 +356,6 @@ async function handleAdminTableClick(event) {
         handleAdminDelete(id, type, name);
     }
 }
-
 
 async function handleAdminDelete(id, type, name) {
     if (!window.confirm(`Sei sicuro di voler eliminare "${name}"?`)) return;
