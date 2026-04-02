@@ -509,8 +509,13 @@ function getEventColor(classroomName) {
     return colors[name] || '#6b7280';
 }
 
-async function fetchEvents() {
+async function fetchEvents(info) {
     let query = sbClient.from('appuntamenti').select('*, studente_id(id, nome), insegnante_id(id, nome), aula_id(id, nome)');
+
+    if (info && info.startStr && info.endStr) {
+        query = query.gte('data_inizio', info.startStr).lte('data_inizio', info.endStr);
+    }
+    
     if (currentUserRole === 'admin') {
         const selectedTeacherId = calendarTeacherFilter.value;
         if (selectedTeacherId && selectedTeacherId !== 'all') query = query.eq('insegnante_id', selectedTeacherId);
@@ -569,7 +574,7 @@ function initializeCalendar() {
         },
         locale: 'it', slotMinTime: '08:00:00', slotMaxTime: '21:00:00', allDaySlot: false,
         selectable: isEditable, editable: isEditable,
-        events: (info, success, fail) => fetchEvents().then(success).catch(fail),
+        events: (info, success, fail) => fetchEvents(info).then(success).catch(fail),
         select: (info) => { if (isEditable) { newAppointmentInfo = info; openModalForNew(); } },
         eventClick: (info) => { 
             if (info.event.extendedProps.isOccupied) return;
