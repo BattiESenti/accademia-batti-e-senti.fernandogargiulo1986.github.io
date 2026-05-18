@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Accademia Musicale - Registro Appuntamenti</title>
     <link rel="icon" type="image/png" href="./favicon.png">
-    
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/main.min.css' rel='stylesheet' />
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
-    
+
     <style>
         html, body { height: 100%; overflow: hidden; }
         .fc .fc-button {
@@ -19,7 +19,7 @@
         }
         .fc .fc-button:hover { background-color: #4338ca; }
         .fc .fc-button:focus { outline: none; box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.5); }
-        .fc .fc-button-primary:not(:disabled).fc-button-active, 
+        .fc .fc-button-primary:not(:disabled).fc-button-active,
         .fc .fc-button-primary:not(:disabled):active { background-color: #3730a3; border-color: #3730a3; }
         .nav-link.active { background-color: #e5e7eb; font-weight: bold; }
         .modal-body { max-height: 80vh; overflow-y: auto; }
@@ -27,18 +27,17 @@
         /* Media Query per migliorare la responsività su mobile */
         @media (max-width: 640px) {
             .fc .fc-toolbar-title {
-                font-size: 1.125rem; /* Riduci la dimensione del titolo */
+                font-size: 1.125rem;
             }
             .fc .fc-button {
-                padding: 0.25rem 0.5rem; /* Riduci il padding dei pulsanti */
-                font-size: 0.75rem; /* Riduci la dimensione del testo dei pulsanti */
+                padding: 0.25rem 0.5rem;
+                font-size: 0.75rem;
             }
             .fc-list-event-title a, .fc-daygrid-event-dot {
-                font-size: 0.875rem; /* Riduci la dimensione del testo degli eventi */
+                font-size: 0.875rem;
             }
-            /* Correzione per la dimensione del font nei menu a tendina su mobile */
             select {
-                font-size: 0.8rem; /* Ridotto ulteriormente per schermi piccoli */
+                font-size: 0.8rem;
             }
         }
     </style>
@@ -184,9 +183,23 @@
                             <label class="block text-sm font-medium text-gray-700">Orario</label>
                             <p id="appointment-time" class="mt-1 text-gray-800"></p>
                         </div>
-                         <div>
+                        <div>
                             <label for="appointment-notes" class="block text-sm font-medium text-gray-700">Note</label>
                             <textarea id="appointment-notes" rows="3" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                        </div>
+                        <!-- APPUNTAMENTO RICORRENTE -->
+                        <div id="recurring-container">
+                            <div class="flex items-center justify-between">
+                                <label class="block text-sm font-medium text-gray-700">Ricorrenza settimanale</label>
+                                <button type="button" id="recurring-toggle" role="switch" aria-checked="false"
+                                    class="relative inline-flex h-6 w-11 items-center rounded-full bg-gray-200 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                                    <span id="recurring-toggle-knob" class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 translate-x-1"></span>
+                                </button>
+                            </div>
+                            <div id="recurring-end-date-container" class="hidden mt-3">
+                                <label for="recurring-end-date" class="block text-sm font-medium text-gray-700">Ripeti fino al</label>
+                                <input type="date" id="recurring-end-date" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                            </div>
                         </div>
                     </div>
                     <div class="mt-6 flex justify-between items-center">
@@ -202,7 +215,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- MODALE ADMIN -->
     <div id="admin-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center p-4">
          <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md modal-body">
@@ -240,4 +253,3 @@
     <script type="module" src="./app.js"></script>
 </body>
 </html>
-
