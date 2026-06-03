@@ -544,7 +544,10 @@ async function fetchEvents(info) {
     }));
 
     if (currentUserRole === 'teacher' || currentUserRole === 'admin') {
-        const { data: occupied, error: rpcError } = await sbClient.rpc('get_occupied_slots');
+        const rpcParams = (info && info.startStr && info.endStr)
+            ? { p_start: info.startStr, p_end: info.endStr }
+            : {};
+        const { data: occupied, error: rpcError } = await sbClient.rpc('get_occupied_slots', rpcParams);
         if (occupied && !rpcError) {
             const otherTeachersSlots = occupied.filter(s => s.insegnante_id !== currentUser.id);
              otherTeachersSlots.forEach(slot => {
