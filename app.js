@@ -46,6 +46,13 @@ const appointmentTeacherName = document.getElementById('appointment-teacher-name
 const cancelButton = document.getElementById('cancel-modal-button');
 const deleteButton = document.getElementById('delete-appointment-button');
 
+// Bottone nuovo appuntamento e input datetime
+const newAppointmentBtn = document.getElementById('new-appointment-btn');
+const appointmentDatetimeInputs = document.getElementById('appointment-datetime-inputs');
+const appointmentDate = document.getElementById('appointment-date');
+const appointmentStartTime = document.getElementById('appointment-start-time');
+const appointmentEndTime = document.getElementById('appointment-end-time');
+
 // Ricorrenza
 const recurringContainer = document.getElementById('recurring-container');
 const recurringToggle = document.getElementById('recurring-toggle');
@@ -194,6 +201,8 @@ function setupEventListeners() {
     adminCancelButton.addEventListener('click', closeAdminModal);
     notesStudentFilter.addEventListener('change', () => renderAppointmentsTable(filterAppointments()));
     notesTeacherFilter.addEventListener('change', () => loadNotesViewData());
+
+    newAppointmentBtn.addEventListener('click', () => openModalForNew());
 
     window.addEventListener('resize', () => {
         if (calendar) {
@@ -583,15 +592,16 @@ function initializeCalendar() {
             right: isMobile ? 'timeGridDay,listWeek' : 'dayGridMonth,timeGridWeek,timeGridDay'
         },
         locale: 'it', slotMinTime: '08:00:00', slotMaxTime: '21:00:00', allDaySlot: false,
-        selectable: isEditable, editable: isEditable,
+        editable: isEditable,
         events: (info, success, fail) => fetchEvents(info).then(success).catch(fail),
-        select: (info) => { if (isEditable) { newAppointmentInfo = info; openModalForNew(); } },
         eventClick: (info) => {
             if (info.event.extendedProps.isOccupied) return;
             if (info.event.display !== 'background') openModalForEdit(info.event);
         }
     });
     calendar.render();
+
+    newAppointmentBtn.classList.toggle('hidden', !isEditable);
 }
 
 // --- LOGICA TOGGLE RICORRENZA ---
@@ -630,8 +640,11 @@ async function openModalForNew() {
     [studentSelect, teacherSelect, classroomSelect].forEach(el => { el.style.display = 'block'; });
     [appointmentStudentName, appointmentTeacherName].forEach(el => { el.style.display = 'none'; });
 
-    const { start, end } = newAppointmentInfo;
-    appointmentTime.textContent = `${start.toLocaleDateString('it-IT')} ${start.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})} - ${end.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})}`;
+    appointmentTime.style.display = 'none';
+    appointmentDatetimeInputs.classList.remove('hidden');
+    appointmentDate.value = new Date().toISOString().slice(0, 10);
+    appointmentStartTime.value = '';
+    appointmentEndTime.value = '';
 
     recurringContainer.style.display = '';
     resetRecurringToggle();
@@ -660,7 +673,9 @@ async function openModalForEdit(event) {
     document.querySelector('#appointment-form button[type="submit"]').style.display = canEdit ? '' : 'none';
 
     appointmentIdInput.value = id;
+    appointmentTime.style.display = '';
     appointmentTime.textContent = `${start.toLocaleDateString('it-IT')} ${start.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})} - ${end.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})}`;
+    appointmentDatetimeInputs.classList.add('hidden');
     appointmentNotes.value = extendedProps.note || '';
     appointmentNotes.readOnly = !canEdit;
 
@@ -704,7 +719,6 @@ async function populateAppointmentSelects(studentId, classroomId, teacherId) {
 function closeModal() {
     modal.classList.add('hidden');
     modal.classList.remove('flex');
-    newAppointmentInfo = null;
 }
 
 cancelButton.addEventListener('click', closeModal);
@@ -723,13 +737,28 @@ appointmentForm.addEventListener('submit', async (event) => {
     if (id) {
         ({ error } = await sbClient.from('appuntamenti').update(appointmentData).eq('id', id));
     } else {
+        const dateVal = appointmentDate.value;
+        const startVal = appointmentStartTime.value;
+        const endVal = appointmentEndTime.value;
+
+        if (!dateVal || !startVal || !endVal) {
+            alert("Inserisci data, ora di inizio e ora di fine.");
+            return;
+        }
+        if (endVal <= startVal) {
+            alert("L'orario di fine deve essere successivo all'inizio.");
+            return;
+        }
+
+        const startISO = new Date(`${dateVal}T${startVal}`).toISOString();
+        const endISO = new Date(`${dateVal}T${endVal}`).toISOString();
+
         const isRecurring = recurringToggle.getAttribute('aria-checked') === 'true';
 
         if (isRecurring && recurringEndDate.value) {
-            // Genera tutti gli appuntamenti settimanali fino alla data limite
             const endLimit = new Date(recurringEndDate.value + 'T23:59:59');
-            let startDate = new Date(newAppointmentInfo.startStr);
-            let endDate = new Date(newAppointmentInfo.endStr);
+            let startDate = new Date(startISO);
+            let endDate = new Date(endISO);
             const weekMs = 7 * 24 * 60 * 60 * 1000;
             const appointments = [];
 
@@ -744,8 +773,8 @@ appointmentForm.addEventListener('submit', async (event) => {
             }
             ({ error } = await sbClient.from('appuntamenti').insert(appointments));
         } else {
-            appointmentData.data_inizio = newAppointmentInfo.startStr;
-            appointmentData.data_fine = newAppointmentInfo.endStr;
+            appointmentData.data_inizio = startISO;
+            appointmentData.data_fine = endISO;
             ({ error } = await sbClient.from('appuntamenti').insert(appointmentData));
         }
     }
