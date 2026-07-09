@@ -160,6 +160,23 @@
         </main>
     </div>
 
+                <!-- VISTA RIEPILOGO LEZIONI (solo admin) -->
+                <div id="summary-view" class="bg-white p-4 sm:p-6 rounded-lg shadow-md hidden flex-grow overflow-auto">
+                    <h2 class="text-2xl font-bold mb-4">Riepilogo Lezioni per Studente</h2>
+                    <div class="flex flex-wrap gap-4 items-end mb-6">
+                        <div>
+                            <label for="summary-from" class="block text-sm font-medium text-gray-700 mb-1">Dal</label>
+                            <input type="date" id="summary-from" class="py-2 px-3 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label for="summary-to" class="block text-sm font-medium text-gray-700 mb-1">Al</label>
+                            <input type="date" id="summary-to" class="py-2 px-3 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                        <button id="summary-generate-btn" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700">Genera riepilogo</button>
+                    </div>
+                    <div id="summary-result" class="overflow-x-auto"></div>
+                </div>
+
     <!-- MODALE APPUNTAMENTO -->
     <div id="appointment-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-md modal-body">

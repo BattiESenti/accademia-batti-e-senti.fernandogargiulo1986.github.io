@@ -18,6 +18,13 @@ const appNavigation = document.getElementById('app-navigation');
 const calendarView = document.getElementById('calendar-view');
 const adminView = document.getElementById('admin-view');
 const notesView = document.getElementById('notes-view');
+const summaryView = document.getElementById('summary-view');
+
+// Riepilogo lezioni
+const summaryFrom = document.getElementById('summary-from');
+const summaryTo = document.getElementById('summary-to');
+const summaryGenerateBtn = document.getElementById('summary-generate-btn');
+const summaryResult = document.getElementById('summary-result');
 
 // Filtri
 const calendarFilterContainer = document.getElementById('calendar-filter-container');
@@ -141,8 +148,7 @@ async function loadUserDataAndRenderUI(user) {
 }
 
 function updateNavigation(role) {
-    const existingAdminLink = document.getElementById('nav-admin');
-    if (existingAdminLink) existingAdminLink.remove();
+    ['nav-admin', 'nav-summary'].forEach(id => document.getElementById(id)?.remove());
     if (role === 'admin') {
         const adminLink = document.createElement('a');
         adminLink.href = '#';
@@ -150,6 +156,13 @@ function updateNavigation(role) {
         adminLink.className = 'nav-link block px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-md';
         adminLink.textContent = 'Amministrazione';
         appNavigation.appendChild(adminLink);
+
+        const summaryLink = document.createElement('a');
+        summaryLink.href = '#';
+        summaryLink.id = 'nav-summary';
+        summaryLink.className = 'nav-link block px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-md';
+        summaryLink.textContent = 'Riepilogo Lezioni';
+        appNavigation.appendChild(summaryLink);
     }
     setupEventListeners();
 }
@@ -167,7 +180,7 @@ async function checkUserSession() {
 // --- GESTIONE VISTE E NAVIGAZIONE ---
 
 function showView(viewName) {
-    [calendarView, adminView, notesView].forEach(v => v.classList.add('hidden'));
+    [calendarView, adminView, notesView, summaryView].forEach(v => v.classList.add('hidden'));
     document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active', 'font-bold'));
 
     let activeLink;
@@ -183,6 +196,9 @@ function showView(viewName) {
         adminView.classList.remove('hidden');
         activeLink = document.getElementById('nav-admin');
         loadAdminData();
+    } else if (viewName === 'summary') {
+        summaryView.classList.remove('hidden');
+        activeLink = document.getElementById('nav-summary');
     }
     if (activeLink) activeLink.classList.add('active', 'font-bold');
 }
@@ -191,6 +207,8 @@ function setupEventListeners() {
     document.getElementById('nav-calendar').addEventListener('click', (e) => { e.preventDefault(); showView('calendar'); });
     document.getElementById('nav-notes').addEventListener('click', (e) => { e.preventDefault(); showView('notes'); });
     document.getElementById('nav-admin')?.addEventListener('click', (e) => { e.preventDefault(); showView('admin'); });
+    document.getElementById('nav-summary')?.addEventListener('click', (e) => { e.preventDefault(); showView('summary'); });
+    summaryGenerateBtn.addEventListener('click', generateSummary);
     Object.keys(adminTabs).forEach(key => adminTabs[key].addEventListener('click', () => showAdminTab(key)));
     Object.values(tableBodies).forEach(tbody => tbody.addEventListener('click', handleAdminTableClick));
     [addStudentBtn, addTeacherBtn, addClassroomBtn].forEach(btn => btn.addEventListener('click', () => {
@@ -791,6 +809,90 @@ deleteButton.addEventListener('click', async () => {
         else { closeModal(); calendar.refetchEvents(); }
     }
 });
+
+// --- RIEPILOGO LEZIONI ---
+
+async function generateSummary() {
+    const from = summaryFrom.value;
+    const to = summaryTo.value;
+
+    if (!from || !to) {
+        alert('Seleziona un intervallo di date.');
+        return;
+    }
+    if (to < from) {
+        alert('La data di fine deve essere successiva alla data di inizio.');
+        return;
+    }
+
+    summaryResult.innerHTML = '<p class="text-gray-500 text-sm">Caricamento...</p>';
+
+    const { data, error } = await sbClient
+        .from('appuntamenti')
+        .select('data_inizio, studente_id(id, nome)')
+        .gte('data_inizio', from + 'T00:00:00')
+        .lte('data_inizio', to + 'T23:59:59')
+        .order('data_inizio', { ascending: true });
+
+    if (error) {
+        summaryResult.innerHTML = `<p class="text-red-500 text-sm">Errore: ${error.message}</p>`;
+        return;
+    }
+
+    if (!data || data.length === 0) {
+        summaryResult.innerHTML = '<p class="text-gray-500 text-sm">Nessuna lezione trovata nell\'intervallo selezionato.</p>';
+        return;
+    }
+
+    // Costruisce l'elenco dei mesi nell'intervallo
+    const months = [];
+    const cursor = new Date(from + 'T00:00:00');
+    const end = new Date(to + 'T00:00:00');
+    cursor.setDate(1);
+    end.setDate(1);
+    while (cursor <= end) {
+        months.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`);
+        cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    // Aggrega: studente → mese → conteggio
+    const students = new Map();
+    data.forEach(apt => {
+        const student = apt.studente_id;
+        if (!student) return;
+        if (!students.has(student.id)) students.set(student.id, { nome: student.nome, counts: {} });
+        const monthKey = apt.data_inizio.slice(0, 7);
+        const s = students.get(student.id);
+        s.counts[monthKey] = (s.counts[monthKey] || 0) + 1;
+    });
+
+    const monthLabel = key => {
+        const [year, month] = key.split('-');
+        return new Date(year, month - 1).toLocaleString('it-IT', { month: 'long', year: 'numeric' });
+    };
+
+    // Render tabella
+    const sorted = [...students.values()].sort((a, b) => a.nome.localeCompare(b.nome));
+    let html = `<table class="min-w-full divide-y divide-gray-200 text-sm">
+        <thead class="bg-gray-50"><tr>
+            <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Studente</th>
+            ${months.map(m => `<th class="px-4 py-3 text-center font-medium text-gray-500 uppercase tracking-wider">${monthLabel(m)}</th>`).join('')}
+            <th class="px-4 py-3 text-center font-medium text-gray-500 uppercase tracking-wider">Totale</th>
+        </tr></thead>
+        <tbody class="bg-white divide-y divide-gray-200">`;
+
+    sorted.forEach(s => {
+        const total = Object.values(s.counts).reduce((a, b) => a + b, 0);
+        html += `<tr>
+            <td class="px-4 py-3 font-medium text-gray-900">${s.nome}</td>
+            ${months.map(m => `<td class="px-4 py-3 text-center text-gray-700">${s.counts[m] || 0}</td>`).join('')}
+            <td class="px-4 py-3 text-center font-bold text-indigo-700">${total}</td>
+        </tr>`;
+    });
+
+    html += '</tbody></table>';
+    summaryResult.innerHTML = html;
+}
 
 // --- INIZIALIZZAZIONE ---
 checkUserSession();
