@@ -845,13 +845,6 @@ async function generateSummary() {
         return;
     }
 
-    if (!data || data.length === 0) {
-        summaryResult.innerHTML = '<p class="text-gray-500 text-sm">Nessuna lezione trovata nell\'intervallo selezionato.</p>';
-        lastSummaryData = null;
-        summaryDownloadBtn.classList.add('hidden');
-        return;
-    }
-
     // Costruisce l'elenco dei mesi nell'intervallo
     const months = [];
     const cursor = new Date(from + 'T00:00:00');
@@ -863,16 +856,27 @@ async function generateSummary() {
         cursor.setMonth(cursor.getMonth() + 1);
     }
 
-    // Aggrega: studente → mese → conteggio
+    // Carica tutti gli studenti e pre-popola la mappa con conteggio zero
+    const { data: allStudents, error: studentsError } = await sbClient
+        .from('profiles').select('id, nome').eq('ruolo', 'student').order('nome');
+    if (studentsError) {
+        summaryResult.innerHTML = `<p class="text-red-500 text-sm">Errore: ${studentsError.message}</p>`;
+        return;
+    }
+
     const students = new Map();
-    data.forEach(apt => {
-        const student = apt.studente_id;
-        if (!student) return;
-        if (!students.has(student.id)) students.set(student.id, { nome: student.nome, counts: {} });
-        const monthKey = apt.data_inizio.slice(0, 7);
-        const s = students.get(student.id);
-        s.counts[monthKey] = (s.counts[monthKey] || 0) + 1;
-    });
+    allStudents.forEach(s => students.set(s.id, { nome: s.nome, counts: {} }));
+
+    // Aggrega gli appuntamenti esistenti nel periodo
+    if (data) {
+        data.forEach(apt => {
+            const student = apt.studente_id;
+            if (!student || !students.has(student.id)) return;
+            const monthKey = apt.data_inizio.slice(0, 7);
+            const s = students.get(student.id);
+            s.counts[monthKey] = (s.counts[monthKey] || 0) + 1;
+        });
+    }
 
     const monthLabel = key => {
         const [year, month] = key.split('-');
