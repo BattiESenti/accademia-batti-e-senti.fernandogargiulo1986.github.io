@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import * as XLSX from "https://esm.sh/xlsx";
 
 // --- CONFIGURAZIONE SUPABASE ---
 const SUPABASE_URL = 'https://nxkcnjzkjboorltirjad.supabase.co';
@@ -24,7 +25,11 @@ const summaryView = document.getElementById('summary-view');
 const summaryFrom = document.getElementById('summary-from');
 const summaryTo = document.getElementById('summary-to');
 const summaryGenerateBtn = document.getElementById('summary-generate-btn');
+const summaryDownloadBtn = document.getElementById('summary-download-btn');
 const summaryResult = document.getElementById('summary-result');
+
+// Dati dell'ultimo riepilogo generato (usati per l'export Excel)
+let lastSummaryData = null;
 
 // Filtri
 const calendarFilterContainer = document.getElementById('calendar-filter-container');
@@ -209,6 +214,7 @@ function setupEventListeners() {
     document.getElementById('nav-admin')?.addEventListener('click', (e) => { e.preventDefault(); showView('admin'); });
     document.getElementById('nav-summary')?.addEventListener('click', (e) => { e.preventDefault(); showView('summary'); });
     summaryGenerateBtn.addEventListener('click', generateSummary);
+    summaryDownloadBtn.addEventListener('click', downloadSummaryExcel);
     Object.keys(adminTabs).forEach(key => adminTabs[key].addEventListener('click', () => showAdminTab(key)));
     Object.values(tableBodies).forEach(tbody => tbody.addEventListener('click', handleAdminTableClick));
     [addStudentBtn, addTeacherBtn, addClassroomBtn].forEach(btn => btn.addEventListener('click', () => {
@@ -841,6 +847,8 @@ async function generateSummary() {
 
     if (!data || data.length === 0) {
         summaryResult.innerHTML = '<p class="text-gray-500 text-sm">Nessuna lezione trovata nell\'intervallo selezionato.</p>';
+        lastSummaryData = null;
+        summaryDownloadBtn.classList.add('hidden');
         return;
     }
 
@@ -892,6 +900,25 @@ async function generateSummary() {
 
     html += '</tbody></table>';
     summaryResult.innerHTML = html;
+
+    lastSummaryData = { months, sorted, monthLabel, from, to };
+    summaryDownloadBtn.classList.remove('hidden');
+}
+
+function downloadSummaryExcel() {
+    if (!lastSummaryData) return;
+    const { months, sorted, monthLabel, from, to } = lastSummaryData;
+
+    const header = ['Studente', ...months.map(monthLabel), 'Totale'];
+    const rows = sorted.map(s => {
+        const total = Object.values(s.counts).reduce((a, b) => a + b, 0);
+        return [s.nome, ...months.map(m => s.counts[m] || 0), total];
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Riepilogo Lezioni');
+    XLSX.writeFile(wb, `riepilogo_lezioni_${from}_${to}.xlsx`);
 }
 
 // --- INIZIALIZZAZIONE ---
