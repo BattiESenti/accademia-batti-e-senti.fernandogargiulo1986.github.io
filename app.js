@@ -601,6 +601,22 @@ async function fetchEvents(info) {
     return allEvents;
 }
 
+// Evita che la vista si apra sempre dalle 08:00: calcola uno scroll iniziale
+// un'ora prima del primo evento del periodo, cosi le lezioni pomeridiane/serali
+// sono visibili senza dover scorrere manualmente (la griglia 08:00-21:00 e
+// piu alta dell'area visibile e richiede scroll).
+function computeScrollTime(events) {
+    const startTimes = events
+        .map(e => e.start)
+        .filter(Boolean)
+        .map(s => new Date(s));
+    if (startTimes.length === 0) return '08:00:00';
+
+    const earliest = new Date(Math.min(...startTimes.map(d => d.getTime())));
+    const paddedHour = Math.max(8, earliest.getHours() - 1);
+    return `${String(paddedHour).padStart(2, '0')}:00:00`;
+}
+
 function initializeCalendar() {
     const calendarEl = document.getElementById('calendar');
     if (calendar) calendar.destroy();
@@ -617,7 +633,10 @@ function initializeCalendar() {
         },
         locale: 'it', slotMinTime: '08:00:00', slotMaxTime: '21:00:00', allDaySlot: false,
         editable: isEditable,
-        events: (info, success, fail) => fetchEvents(info).then(success).catch(fail),
+        events: (info, success, fail) => fetchEvents(info).then(events => {
+            success(events);
+            calendar.scrollToTime(computeScrollTime(events));
+        }).catch(fail),
         eventClick: (info) => {
             if (info.event.extendedProps.isOccupied) return;
             if (info.event.display !== 'background') openModalForEdit(info.event);
