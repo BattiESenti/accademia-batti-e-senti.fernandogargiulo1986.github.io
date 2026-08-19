@@ -1,0 +1,115 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
+import type { AppuntamentoRelations, OccupiedSlot } from '../types';
+
+const APPOINTMENT_SELECT = '*, studente_id(id, nome), insegnante_id(id, nome), aula_id(id, nome)';
+
+export interface DateRange {
+  start: string;
+  end: string;
+}
+
+export function useCalendarAppointments(range: DateRange | null, teacherFilterId: string) {
+  const { profile, user } = useAuth();
+
+  return useQuery({
+    queryKey: ['appointments', range?.start, range?.end, profile?.ruolo, user?.id, teacherFilterId],
+    enabled: !!profile && !!range,
+    queryFn: async (): Promise<AppuntamentoRelations[]> => {
+      let query = supabase.from('appuntamenti').select(APPOINTMENT_SELECT);
+
+      if (range) {
+        query = query.gte('data_inizio', range.start).lte('data_inizio', range.end);
+      }
+
+      if (profile!.ruolo === 'admin') {
+        if (teacherFilterId && teacherFilterId !== 'all') {
+          query = query.eq('insegnante_id', teacherFilterId);
+        }
+      } else if (profile!.ruolo === 'teacher') {
+        query = query.eq('insegnante_id', user!.id);
+      } else {
+        query = query.eq('studente_id', user!.id);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as unknown as AppuntamentoRelations[];
+    },
+  });
+}
+
+export function useOccupiedSlots(range: DateRange | null) {
+  const { profile } = useAuth();
+  const canSeeOccupied = profile?.ruolo === 'admin' || profile?.ruolo === 'teacher';
+
+  return useQuery({
+    queryKey: ['occupied-slots', range?.start, range?.end, profile?.ruolo],
+    enabled: canSeeOccupied && !!range,
+    queryFn: async (): Promise<OccupiedSlot[]> => {
+      const { data, error } = await supabase.rpc('get_occupied_slots', {
+        p_start: range?.start,
+        p_end: range?.end,
+      });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export interface AppointmentFormInput {
+  studente_id: string;
+  insegnante_id: string;
+  aula_id: string;
+  note: string;
+}
+
+function invalidateAppointments(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: ['appointments'] });
+  queryClient.invalidateQueries({ queryKey: ['occupied-slots'] });
+}
+
+export function useCreateAppointment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: AppointmentFormInput & { data_inizio: string; data_fine: string }) => {
+      const { error } = await supabase.from('appuntamenti').insert(payload);
+      if (error) throw error;
+    },
+    onSuccess: () => invalidateAppointments(queryClient),
+  });
+}
+
+export function useCreateRecurringAppointments() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: (AppointmentFormInput & { data_inizio: string; data_fine: string })[]) => {
+      const { error } = await supabase.from('appuntamenti').insert(payload);
+      if (error) throw error;
+    },
+    onSuccess: () => invalidateAppointments(queryClient),
+  });
+}
+
+export function useUpdateAppointment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, payload }: { id: string; payload: AppointmentFormInput }) => {
+      const { error } = await supabase.from('appuntamenti').update(payload).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => invalidateAppointments(queryClient),
+  });
+}
+
+export function useDeleteAppointment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('appuntamenti').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => invalidateAppointments(queryClient),
+  });
+}
