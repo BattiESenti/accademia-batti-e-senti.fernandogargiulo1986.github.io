@@ -84,7 +84,7 @@ export function useCreateAppointment() {
 export function useCreateRecurringAppointments() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: (AppointmentFormInput & { data_inizio: string; data_fine: string })[]) => {
+    mutationFn: async (payload: (AppointmentFormInput & { data_inizio: string; data_fine: string; serie_id: string })[]) => {
       const { error } = await supabase.from('appuntamenti').insert(payload);
       if (error) throw error;
     },
@@ -108,6 +108,31 @@ export function useDeleteAppointment() {
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from('appuntamenti').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => invalidateAppointments(queryClient),
+  });
+}
+
+// Modifica/eliminazione dell'intera serie ricorrente (tutte le righe che
+// condividono lo stesso serie_id). Non tocca data_inizio/data_fine: ogni
+// occorrenza mantiene il proprio orario, si aggiornano solo gli altri campi.
+export function useUpdateAppointmentSeries() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ serieId, payload }: { serieId: string; payload: AppointmentFormInput }) => {
+      const { error } = await supabase.from('appuntamenti').update(payload).eq('serie_id', serieId);
+      if (error) throw error;
+    },
+    onSuccess: () => invalidateAppointments(queryClient),
+  });
+}
+
+export function useDeleteAppointmentSeries() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (serieId: string) => {
+      const { error } = await supabase.from('appuntamenti').delete().eq('serie_id', serieId);
       if (error) throw error;
     },
     onSuccess: () => invalidateAppointments(queryClient),

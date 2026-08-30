@@ -6,6 +6,8 @@ import {
   useCreateRecurringAppointments,
   useUpdateAppointment,
   useDeleteAppointment,
+  useUpdateAppointmentSeries,
+  useDeleteAppointmentSeries,
 } from '../hooks/useAppointments';
 import type { AppuntamentoRelations } from '../types';
 
@@ -33,11 +35,14 @@ export function AppointmentModal({ isOpen, onClose, appointment, defaultDate, de
   const createRecurring = useCreateRecurringAppointments();
   const updateAppointment = useUpdateAppointment();
   const deleteAppointment = useDeleteAppointment();
+  const updateSeries = useUpdateAppointmentSeries();
+  const deleteSeries = useDeleteAppointmentSeries();
 
   const isCreate = appointment === null;
   const canEdit = isCreate
     || profile?.ruolo === 'admin'
     || (profile?.ruolo === 'teacher' && appointment.insegnante_id?.id === user?.id);
+  const isPartOfSeries = !isCreate && !!appointment.serie_id;
 
   const [studentId, setStudentId] = useState('');
   const [teacherId, setTeacherId] = useState('');
@@ -48,6 +53,7 @@ export function AppointmentModal({ isOpen, onClose, appointment, defaultDate, de
   const [endTime, setEndTime] = useState('');
   const [recurring, setRecurring] = useState(false);
   const [recurringEndDate, setRecurringEndDate] = useState('');
+  const [scope, setScope] = useState<'single' | 'series'>('single');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -55,6 +61,7 @@ export function AppointmentModal({ isOpen, onClose, appointment, defaultDate, de
     setError('');
     setRecurring(false);
     setRecurringEndDate('');
+    setScope('single');
 
     if (isCreate) {
       setStudentId('');
@@ -101,7 +108,11 @@ export function AppointmentModal({ isOpen, onClose, appointment, defaultDate, de
 
     try {
       if (!isCreate) {
-        await updateAppointment.mutateAsync({ id: appointment.id, payload });
+        if (scope === 'series' && appointment.serie_id) {
+          await updateSeries.mutateAsync({ serieId: appointment.serie_id, payload });
+        } else {
+          await updateAppointment.mutateAsync({ id: appointment.id, payload });
+        }
         onClose();
         return;
       }
@@ -119,16 +130,18 @@ export function AppointmentModal({ isOpen, onClose, appointment, defaultDate, de
       const endISO = new Date(`${date}T${endTime}`).toISOString();
 
       if (recurring && recurringEndDate) {
+        const serieId = crypto.randomUUID();
         const endLimit = new Date(`${recurringEndDate}T23:59:59`);
         let cursorStart = new Date(startISO);
         let cursorEnd = new Date(endISO);
-        const appointments: (typeof payload & { data_inizio: string; data_fine: string })[] = [];
+        const appointments: (typeof payload & { data_inizio: string; data_fine: string; serie_id: string })[] = [];
 
         while (cursorStart <= endLimit) {
           appointments.push({
             ...payload,
             data_inizio: cursorStart.toISOString(),
             data_fine: cursorEnd.toISOString(),
+            serie_id: serieId,
           });
           cursorStart = new Date(cursorStart.getTime() + WEEK_MS);
           cursorEnd = new Date(cursorEnd.getTime() + WEEK_MS);
@@ -145,6 +158,18 @@ export function AppointmentModal({ isOpen, onClose, appointment, defaultDate, de
 
   async function handleDelete() {
     if (isCreate) return;
+
+    if (scope === 'series' && appointment.serie_id) {
+      if (!window.confirm('Sei sicuro di voler eliminare TUTTA la serie di lezioni ricorrenti? L\'operazione non è reversibile.')) return;
+      try {
+        await deleteSeries.mutateAsync(appointment.serie_id);
+        onClose();
+      } catch (err) {
+        setError('Errore: ' + (err instanceof Error ? err.message : 'operazione non riuscita'));
+      }
+      return;
+    }
+
     if (!window.confirm('Sei sicuro di voler eliminare questo appuntamento?')) return;
     try {
       await deleteAppointment.mutateAsync(appointment.id);
@@ -154,7 +179,8 @@ export function AppointmentModal({ isOpen, onClose, appointment, defaultDate, de
     }
   }
 
-  const isSaving = createAppointment.isPending || createRecurring.isPending || updateAppointment.isPending;
+  const isSaving = createAppointment.isPending || createRecurring.isPending || updateAppointment.isPending || updateSeries.isPending;
+  const isDeleting = deleteAppointment.isPending || deleteSeries.isPending;
   const teacherLocked = profile?.ruolo === 'teacher';
 
   return (
@@ -164,6 +190,31 @@ export function AppointmentModal({ isOpen, onClose, appointment, defaultDate, de
           <h3 className="text-xl font-bold mb-4">{isCreate ? 'Nuovo Appuntamento' : 'Dettagli Appuntamento'}</h3>
           <form onSubmit={handleSubmit}>
             <div className="space-y-4">
+              {isPartOfSeries && canEdit && (
+                <div className="bg-indigo-50 border border-indigo-100 rounded-md p-3">
+                  <p className="text-sm font-medium text-gray-700 mb-2">Questa lezione fa parte di una serie ricorrente. Applica le modifiche a:</p>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-1.5 text-sm text-gray-700">
+                      <input
+                        type="radio"
+                        name="scope"
+                        checked={scope === 'single'}
+                        onChange={() => setScope('single')}
+                      />
+                      Solo questo appuntamento
+                    </label>
+                    <label className="flex items-center gap-1.5 text-sm text-gray-700">
+                      <input
+                        type="radio"
+                        name="scope"
+                        checked={scope === 'series'}
+                        onChange={() => setScope('series')}
+                      />
+                      Tutta la serie
+                    </label>
+                  </div>
+                </div>
+              )}
               {canEdit ? (
                 <>
                   <div>
@@ -309,9 +360,10 @@ export function AppointmentModal({ isOpen, onClose, appointment, defaultDate, de
                   <button
                     type="button"
                     onClick={handleDelete}
-                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+                    disabled={isDeleting}
+                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-60"
                   >
-                    Elimina
+                    {isDeleting ? 'Eliminazione...' : scope === 'series' ? 'Elimina serie' : 'Elimina'}
                   </button>
                 )}
               </div>
@@ -329,7 +381,7 @@ export function AppointmentModal({ isOpen, onClose, appointment, defaultDate, de
                     disabled={isSaving}
                     className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-60"
                   >
-                    {isSaving ? 'Salvataggio...' : 'Salva'}
+                    {isSaving ? 'Salvataggio...' : scope === 'series' ? 'Salva serie' : 'Salva'}
                   </button>
                 )}
               </div>

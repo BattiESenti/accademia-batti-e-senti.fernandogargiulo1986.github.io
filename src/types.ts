@@ -27,6 +27,7 @@ export interface AppuntamentoRelations {
   data_inizio: string;
   data_fine: string;
   note: string | null;
+  serie_id: string | null;
   studente_id: { id: string; nome: string } | null;
   insegnante_id: { id: string; nome: string } | null;
   aula_id: { id: string; nome: string } | null;
