@@ -7,8 +7,10 @@ import {
   useUpdateAppointment,
   useDeleteAppointment,
   useUpdateAppointmentSeries,
+  useUpdateAppointmentSeriesTime,
   useDeleteAppointmentSeries,
 } from '../hooks/useAppointments';
+import { toLocalDateInputValue, toLocalTimeInputValue } from '../lib/datetime';
 import type { AppuntamentoRelations } from '../types';
 
 interface AppointmentModalProps {
@@ -36,6 +38,7 @@ export function AppointmentModal({ isOpen, onClose, appointment, defaultDate, de
   const updateAppointment = useUpdateAppointment();
   const deleteAppointment = useDeleteAppointment();
   const updateSeries = useUpdateAppointmentSeries();
+  const updateSeriesTime = useUpdateAppointmentSeriesTime();
   const deleteSeries = useDeleteAppointmentSeries();
 
   const isCreate = appointment === null;
@@ -66,7 +69,7 @@ export function AppointmentModal({ isOpen, onClose, appointment, defaultDate, de
     if (isCreate) {
       setStudentId('');
       setNotes('');
-      setDate(defaultDate ?? new Date().toISOString().slice(0, 10));
+      setDate(defaultDate ?? toLocalDateInputValue(new Date()));
       setStartTime(defaultStartTime ?? '');
       setEndTime(defaultEndTime ?? '');
       if (profile?.ruolo === 'teacher') {
@@ -82,9 +85,9 @@ export function AppointmentModal({ isOpen, onClose, appointment, defaultDate, de
       setClassroomId(appointment.aula_id?.id ?? '');
       setNotes(appointment.note ?? '');
       const start = new Date(appointment.data_inizio);
-      setDate(start.toISOString().slice(0, 10));
-      setStartTime(start.toTimeString().slice(0, 5));
-      setEndTime(new Date(appointment.data_fine).toTimeString().slice(0, 5));
+      setDate(toLocalDateInputValue(start));
+      setStartTime(toLocalTimeInputValue(start));
+      setEndTime(toLocalTimeInputValue(new Date(appointment.data_fine)));
     }
   }, [isOpen, isCreate, appointment, defaultDate, defaultStartTime, defaultEndTime, profile, user]);
 
@@ -108,10 +111,25 @@ export function AppointmentModal({ isOpen, onClose, appointment, defaultDate, de
 
     try {
       if (!isCreate) {
+        if (!startTime || !endTime) {
+          setError('Inserisci ora di inizio e ora di fine.');
+          return;
+        }
+        if (endTime <= startTime) {
+          setError("L'orario di fine deve essere successivo all'inizio.");
+          return;
+        }
+
         if (scope === 'series' && appointment.serie_id) {
-          await updateSeries.mutateAsync({ serieId: appointment.serie_id, payload });
+          await updateSeriesTime.mutateAsync({ serieId: appointment.serie_id, payload, startTime, endTime });
         } else {
-          await updateAppointment.mutateAsync({ id: appointment.id, payload });
+          if (!date) {
+            setError('Inserisci la data.');
+            return;
+          }
+          const data_inizio = new Date(`${date}T${startTime}`).toISOString();
+          const data_fine = new Date(`${date}T${endTime}`).toISOString();
+          await updateAppointment.mutateAsync({ id: appointment.id, payload: { ...payload, data_inizio, data_fine } });
         }
         onClose();
         return;
@@ -179,7 +197,7 @@ export function AppointmentModal({ isOpen, onClose, appointment, defaultDate, de
     }
   }
 
-  const isSaving = createAppointment.isPending || createRecurring.isPending || updateAppointment.isPending || updateSeries.isPending;
+  const isSaving = createAppointment.isPending || createRecurring.isPending || updateAppointment.isPending || updateSeries.isPending || updateSeriesTime.isPending;
   const isDeleting = deleteAppointment.isPending || deleteSeries.isPending;
   const teacherLocked = profile?.ruolo === 'teacher';
 
@@ -263,20 +281,25 @@ export function AppointmentModal({ isOpen, onClose, appointment, defaultDate, de
               )}
 
               <div>
-                {isCreate ? (
+                {canEdit ? (
                   <div className="space-y-2">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Data</label>
-                      <input
-                        type="date"
-                        required
-                        value={date}
-                        onChange={(e) => setDate(e.target.value)}
-                        className="block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                      />
-                    </div>
+                    {!(isPartOfSeries && scope === 'series') && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Data</label>
+                        <input
+                          type="date"
+                          required
+                          value={date}
+                          onChange={(e) => setDate(e.target.value)}
+                          className="block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                        />
+                      </div>
+                    )}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Orario</label>
+                      {isPartOfSeries && scope === 'series' && (
+                        <p className="text-xs text-gray-500 mb-1">Si applica a tutte le lezioni della serie, ciascuna mantiene la propria data.</p>
+                      )}
                       <div className="flex gap-2">
                         <div className="flex-1">
                           <label className="block text-xs text-gray-500 mb-1">Inizio</label>

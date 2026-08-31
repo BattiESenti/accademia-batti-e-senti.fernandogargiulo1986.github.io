@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { toLocalDateInputValue } from '../lib/datetime';
 import type { AppuntamentoRelations, OccupiedSlot } from '../types';
 
 const APPOINTMENT_SELECT = '*, studente_id(id, nome), insegnante_id(id, nome), aula_id(id, nome)';
@@ -95,7 +96,7 @@ export function useCreateRecurringAppointments() {
 export function useUpdateAppointment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, payload }: { id: string; payload: AppointmentFormInput }) => {
+    mutationFn: async ({ id, payload }: { id: string; payload: AppointmentFormInput & { data_inizio: string; data_fine: string } }) => {
       const { error } = await supabase.from('appuntamenti').update(payload).eq('id', id);
       if (error) throw error;
     },
@@ -139,6 +140,44 @@ export function useUpdateAppointmentSeries() {
     mutationFn: async ({ serieId, payload }: { serieId: string; payload: AppointmentFormInput }) => {
       const { error } = await supabase.from('appuntamenti').update(payload).eq('serie_id', serieId);
       if (error) throw error;
+    },
+    onSuccess: () => invalidateAppointments(queryClient),
+  });
+}
+
+// Modifica l'orario (ora inizio/fine) di tutta la serie, mantenendo la data
+// propria di ciascuna occorrenza. Va eseguita riga per riga perche' ogni
+// occorrenza ha una data diversa a cui applicare il nuovo orario.
+export function useUpdateAppointmentSeriesTime() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      serieId,
+      payload,
+      startTime,
+      endTime,
+    }: {
+      serieId: string;
+      payload: AppointmentFormInput;
+      startTime: string;
+      endTime: string;
+    }) => {
+      const { data: rows, error: fetchError } = await supabase
+        .from('appuntamenti')
+        .select('id, data_inizio')
+        .eq('serie_id', serieId);
+      if (fetchError) throw fetchError;
+
+      const results = await Promise.all(
+        (rows ?? []).map((row) => {
+          const dateStr = toLocalDateInputValue(new Date(row.data_inizio));
+          const data_inizio = new Date(`${dateStr}T${startTime}`).toISOString();
+          const data_fine = new Date(`${dateStr}T${endTime}`).toISOString();
+          return supabase.from('appuntamenti').update({ ...payload, data_inizio, data_fine }).eq('id', row.id);
+        })
+      );
+      const firstError = results.find((r) => r.error)?.error;
+      if (firstError) throw firstError;
     },
     onSuccess: () => invalidateAppointments(queryClient),
   });
