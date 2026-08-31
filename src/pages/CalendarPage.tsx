@@ -4,11 +4,12 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import listPlugin from '@fullcalendar/list';
 import interactionPlugin from '@fullcalendar/interaction';
-import type { EventClickArg, EventInput, DatesSetArg, DateSelectArg } from '@fullcalendar/core';
+import type { EventClickArg, EventInput, DatesSetArg, DateSelectArg, EventDropArg } from '@fullcalendar/core';
+import type { EventResizeDoneArg } from '@fullcalendar/interaction';
 import itLocale from '@fullcalendar/core/locales/it';
 import { useAuth } from '../contexts/AuthContext';
 import { useTeachers } from '../hooks/useProfiles';
-import { useCalendarAppointments, useOccupiedSlots, type DateRange } from '../hooks/useAppointments';
+import { useCalendarAppointments, useOccupiedSlots, useMoveAppointment, type DateRange } from '../hooks/useAppointments';
 import { getEventColor } from '../lib/colors';
 import { AppointmentModal } from '../components/AppointmentModal';
 import type { AppuntamentoRelations } from '../types';
@@ -39,6 +40,7 @@ export function CalendarPage() {
   const { data: teachers } = useTeachers();
   const { data: appointments } = useCalendarAppointments(range, teacherFilterId);
   const { data: occupiedSlots } = useOccupiedSlots(range);
+  const moveAppointment = useMoveAppointment();
 
   const handleDatesSet = useCallback((arg: DatesSetArg) => {
     setRange({ start: arg.startStr, end: arg.endStr });
@@ -55,10 +57,14 @@ export function CalendarPage() {
       extendedProps: { appointment: apt },
     }));
 
-    if (!occupiedSlots) return apptEvents;
+    // L'overlay "Occupato" serve solo agli insegnanti, per segnalare slot
+    // impegnati da altri senza mostrarne i dettagli. L'admin vede gia' tutti
+    // gli appuntamenti con nome studente/insegnante tramite apptEvents, quindi
+    // per l'admin l'overlay sarebbe solo un duplicato dello stesso slot.
+    if (!occupiedSlots || profile?.ruolo !== 'teacher') return apptEvents;
 
     const occupiedEvents: EventInput[] = occupiedSlots
-      .filter((slot) => slot.insegnante_id !== (profile?.ruolo === 'teacher' ? profile.id : null))
+      .filter((slot) => slot.insegnante_id !== profile.id)
       .map((slot) => ({
         title: `Occupato (${slot.aula_nome ?? 'N/D'})`,
         start: slot.data_inizio,
@@ -101,6 +107,26 @@ export function CalendarPage() {
     if (!appointment) return;
     setEditingAppointment(appointment);
     setModalOpen(true);
+  }
+
+  async function persistMove(id: string, start: Date | null, end: Date | null, revert: () => void) {
+    if (!start || !end) { revert(); return; }
+    try {
+      await moveAppointment.mutateAsync({ id, dataInizio: start.toISOString(), dataFine: end.toISOString() });
+    } catch (err) {
+      alert('Errore: ' + (err instanceof Error ? err.message : 'spostamento non riuscito'));
+      revert();
+    }
+  }
+
+  function handleEventDrop(arg: EventDropArg) {
+    if (arg.event.extendedProps.isOccupied) { arg.revert(); return; }
+    persistMove(arg.event.id, arg.event.start, arg.event.end, arg.revert);
+  }
+
+  function handleEventResize(arg: EventResizeDoneArg) {
+    if (arg.event.extendedProps.isOccupied) { arg.revert(); return; }
+    persistMove(arg.event.id, arg.event.start, arg.event.end, arg.revert);
   }
 
   function openNewAppointment() {
@@ -178,6 +204,8 @@ export function CalendarPage() {
           events={events}
           datesSet={handleDatesSet}
           eventClick={handleEventClick}
+          eventDrop={handleEventDrop}
+          eventResize={handleEventResize}
         />
       </div>
 

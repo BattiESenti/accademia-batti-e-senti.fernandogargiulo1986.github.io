@@ -103,6 +103,22 @@ export function useUpdateAppointment() {
   });
 }
 
+// Sposta/ridimensiona un appuntamento trascinato sul calendario, senza
+// toccare studente/insegnante/aula/note.
+export function useMoveAppointment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, dataInizio, dataFine }: { id: string; dataInizio: string; dataFine: string }) => {
+      const { error } = await supabase
+        .from('appuntamenti')
+        .update({ data_inizio: dataInizio, data_fine: dataFine })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => invalidateAppointments(queryClient),
+  });
+}
+
 export function useDeleteAppointment() {
   const queryClient = useQueryClient();
   return useMutation({

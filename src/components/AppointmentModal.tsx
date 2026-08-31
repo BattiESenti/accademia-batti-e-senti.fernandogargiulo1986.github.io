@@ -263,46 +263,54 @@ export function AppointmentModal({ isOpen, onClose, appointment, defaultDate, de
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Orario</label>
                 {isCreate ? (
-                  <div className="space-y-2 mt-1">
-                    <input
-                      type="date"
-                      required
-                      value={date}
-                      onChange={(e) => setDate(e.target.value)}
-                      className="block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                    />
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                        <label className="block text-xs text-gray-500 mb-1">Inizio</label>
-                        <input
-                          type="time"
-                          required
-                          value={startTime}
-                          onChange={(e) => setStartTime(e.target.value)}
-                          className="block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <label className="block text-xs text-gray-500 mb-1">Fine</label>
-                        <input
-                          type="time"
-                          required
-                          value={endTime}
-                          onChange={(e) => setEndTime(e.target.value)}
-                          className="block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                        />
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Data</label>
+                      <input
+                        type="date"
+                        required
+                        value={date}
+                        onChange={(e) => setDate(e.target.value)}
+                        className="block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Orario</label>
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <label className="block text-xs text-gray-500 mb-1">Inizio</label>
+                          <input
+                            type="time"
+                            required
+                            value={startTime}
+                            onChange={(e) => setStartTime(e.target.value)}
+                            className="block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-xs text-gray-500 mb-1">Fine</label>
+                          <input
+                            type="time"
+                            required
+                            value={endTime}
+                            onChange={(e) => setEndTime(e.target.value)}
+                            className="block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <p className="mt-1 text-gray-800">
-                    {new Date(appointment!.data_inizio).toLocaleDateString('it-IT')}{' '}
-                    {new Date(appointment!.data_inizio).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
-                    {' - '}
-                    {new Date(appointment!.data_fine).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
-                  </p>
+                  <>
+                    <label className="block text-sm font-medium text-gray-700">Data e Orario</label>
+                    <p className="mt-1 text-gray-800">
+                      {new Date(appointment!.data_inizio).toLocaleDateString('it-IT')}{' '}
+                      {new Date(appointment!.data_inizio).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                      {' - '}
+                      {new Date(appointment!.data_fine).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </>
                 )}
               </div>
 
