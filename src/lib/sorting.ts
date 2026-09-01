@@ -4,6 +4,6 @@
  * l'ordinamento alfabetico sull'intera stringa ordina prima per nome e poi
  * per cognome, coerentemente con come vengono registrati studenti/insegnanti.
  */
-export function sortByNome<T extends { nome: string }>(items: T[]): T[] {
-  return [...items].sort((a, b) => a.nome.localeCompare(b.nome, 'it', { sensitivity: 'base' }));
+export function sortByNome<T extends { nome: string | null | undefined }>(items: T[]): T[] {
+  return [...items].sort((a, b) => (a.nome ?? '').localeCompare(b.nome ?? '', 'it', { sensitivity: 'base' }));
 }
