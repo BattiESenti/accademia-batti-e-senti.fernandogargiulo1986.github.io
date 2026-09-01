@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { sortByNome } from '../lib/sorting';
 import type { AdminProfile, Aula, Ruolo } from '../types';
 
 export function useAdminProfiles() {
@@ -8,7 +9,7 @@ export function useAdminProfiles() {
     queryFn: async (): Promise<AdminProfile[]> => {
       const { data, error } = await supabase.rpc('get_all_user_profiles');
       if (error) throw error;
-      return data as AdminProfile[];
+      return sortByNome(data as AdminProfile[]);
     },
   });
 }
@@ -19,7 +20,7 @@ export function useAdminClassrooms() {
     queryFn: async (): Promise<Aula[]> => {
       const { data, error } = await supabase.from('aule').select('id, nome');
       if (error) throw error;
-      return data;
+      return sortByNome(data);
     },
   });
 }

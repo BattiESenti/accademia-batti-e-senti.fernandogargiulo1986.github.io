@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { sortByNome } from '../lib/sorting';
 import type { Profile, Aula } from '../types';
 
 export function useTeachers() {
@@ -11,7 +12,7 @@ export function useTeachers() {
         .select('id, nome')
         .eq('ruolo', 'teacher');
       if (error) throw error;
-      return data;
+      return sortByNome(data);
     },
   });
 }
@@ -25,7 +26,7 @@ export function useStudents() {
         .select('id, nome')
         .eq('ruolo', 'student');
       if (error) throw error;
-      return data;
+      return sortByNome(data);
     },
   });
 }
@@ -36,7 +37,7 @@ export function useClassrooms() {
     queryFn: async (): Promise<Aula[]> => {
       const { data, error } = await supabase.from('aule').select('id, nome');
       if (error) throw error;
-      return data;
+      return sortByNome(data);
     },
   });
 }

@@ -49,7 +49,7 @@ export function NotesPage() {
     appointments?.forEach((apt) => {
       if (apt.studente_id) map.set(apt.studente_id.id, apt.studente_id.nome);
     });
-    return [...map.entries()];
+    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1], 'it', { sensitivity: 'base' }));
   }, [appointments]);
 
   const filtered = useMemo(() => {
